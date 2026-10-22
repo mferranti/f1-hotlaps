@@ -1,0 +1,20 @@
+node_modules/
+
+# Continuous native generation: ios/ and android/ come from `expo prebuild`
+ios/
+android/
+
+.expo/
+expo-env.d.ts
+dist/
+web-build/
+coverage/
+*.tsbuildinfo
+
+# Full packet recordings; trimmed fixtures live in fixtures/packets/
+fixtures/captures/
+
+.env
+.env.local
+.DS_Store
+*.log

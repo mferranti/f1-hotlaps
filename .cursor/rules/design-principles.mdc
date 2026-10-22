@@ -1,0 +1,28 @@
+---
+description: DRY, KISS, and SOLID apply to every change in this project
+alwaysApply: true
+---
+
+# Design principles
+
+Apply DRY, KISS, and SOLID on every change. Choose the smallest design that still gives each module one reason to change.
+
+## DRY
+
+One concept has one home. Call that home from every game, screen, and store.
+
+```typescript
+formatLapTime(lap.timeMs) // screens call this; they do not format times themselves
+```
+
+## KISS
+
+Ship the straight path. Add a layer when a second caller needs it. A function that checks one lap and returns it is enough until two callers share that check.
+
+## SOLID
+
+- **S** — Decoding a packet, deciding a lap counts, and saving it live in separate modules.
+- **O** — A new game year arrives as a new decoder beside the old one.
+- **L** — A stand-in decoder can replace the real one in tests and still return a lap.
+- **I** — The live screen asks for speed, throttle, and brake. It does not receive the UDP socket.
+- **D** — Storage is used through a small repository. Screens never open the database.
