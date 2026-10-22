@@ -6,7 +6,7 @@ F1 Hotlaps: one Expo app (iOS and Android, dev builds only) at the repo root. It
 - Use the terms in `GLOSSARY.md` in code, UI text, and tests (Packet, Lap, Fastest, Latest, Trace, Condition…), not their _Avoid_ words.
 - Follow `.cursor/rules/design-principles.mdc` (DRY, KISS, SOLID).
 - `docs/telemetry/` is the source of truth for the protocol: `f1-25-udp-spec.txt`, `f1-26-udp-spec.txt`, and the Season 8 PDF (track and session-type appendix, covers F1 26).
-- Recorded Packet fixtures for tests live in `fixtures/packets/` (trimmed, gzipped, committed). Full captures go in `fixtures/captures/` (gitignored).
+- Recorded Packet fixtures for tests live in `fixtures/packets/` (trimmed, gzipped, committed). Full captures go in `fixtures/captures/` (gitignored). Load one in Jest with `readPacketFile(path)` from `scripts/packet-file.ts` (relative import); it returns `{ offsetMs, bytes }[]` and reads raw or gzipped files. Format and fixture list: `fixtures/packets/README.md`.
 
 ## Commands
 
