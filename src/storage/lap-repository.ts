@@ -139,4 +139,6 @@ export interface LapRepository {
   usedBytes(): Promise<number>;
   /** Deletes stored Laps. When keepFastest is true, the Fastest Lap in each group remains. This cannot be undone. */
   wipeAll(keepFastest?: boolean): Promise<void>;
+  /** Replaces every stored Session, Lap, and Trace. This cannot be undone. */
+  replaceAll(data: StoredData): Promise<void>;
 }

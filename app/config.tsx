@@ -7,7 +7,8 @@ import Svg, { Path, Rect } from "react-native-svg";
 
 import { restartRuntime, lapRepository } from "@/capture/runtime";
 import { formatMegabytes } from "@/domain/format";
-import { exportLaps } from "@/storage/export";
+import { exportLaps, pickExport } from "@/storage/export";
+import type { StoredData } from "@/storage/lap-repository";
 import { SettingsRepository, validatePort, type Settings } from "@/storage/settings-repository";
 import { colors } from "@/ui/theme";
 
@@ -25,6 +26,9 @@ export default function ConfigScreen() {
   const [draft, setDraft] = useState<Settings>(DEFAULTS);
   const [portOpen, setPortOpen] = useState(false);
   const [wipeOpen, setWipeOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [pendingImport, setPendingImport] = useState<StoredData | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
   const [keepFastest, setKeepFastest] = useState(true);
   const [portText, setPortText] = useState("20777");
   const [error, setError] = useState<string | null>(null);
@@ -126,6 +130,24 @@ export default function ConfigScreen() {
       <Pressable
         style={styles.action}
         onPress={() => {
+          setImportError(null);
+          void pickExport()
+            .then((data) => {
+              if (!data) return;
+              setPendingImport(data);
+              setImportOpen(true);
+            })
+            .catch((error: unknown) => {
+              setImportError(error instanceof Error ? error.message : "This file is not an F1 Hotlaps export.");
+            });
+        }}
+      >
+        <Text style={styles.actionText}>Import</Text>
+      </Pressable>
+      {importError ? <Text style={styles.error}>{importError}</Text> : null}
+      <Pressable
+        style={styles.action}
+        onPress={() => {
           setKeepFastest(true);
           setWipeOpen(true);
         }}
@@ -166,6 +188,39 @@ export default function ConfigScreen() {
             >
               <Text style={styles.actionText}>Save</Text>
             </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={importOpen} animationType="fade" transparent onRequestClose={() => setImportOpen(false)}>
+        <View style={styles.backdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setImportOpen(false)} />
+          <View style={styles.popup}>
+            <Text style={styles.title}>Import</Text>
+            <Text style={styles.muted}>
+              This replaces stored Sessions, Laps, and Traces. This operation is not recoverable.
+            </Text>
+            <View style={styles.row}>
+              <Pressable style={styles.action} onPress={() => setImportOpen(false)}>
+                <Text style={styles.actionText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={styles.action}
+                onPress={() => {
+                  const data = pendingImport;
+                  setImportOpen(false);
+                  setPendingImport(null);
+                  if (!data) return;
+                  void lapRepository()
+                    .replaceAll(data)
+                    .then(() => lapRepository().usedBytes())
+                    .then(setUsedBytes)
+                    .catch(() => setImportError("This file is not an F1 Hotlaps export."));
+                }}
+              >
+                <Text style={styles.actionText}>Import</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>

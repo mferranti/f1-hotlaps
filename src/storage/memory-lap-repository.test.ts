@@ -125,6 +125,69 @@ describe("MemoryLapRepository", () => {
     expect(await repo.usedBytes()).toBe(0);
   });
 
+  it("replaces every Session, Lap, and Trace and keeps the stored ids", async () => {
+    const repo = new MemoryLapRepository();
+    await repo.saveSessionResult({ game: "f1-26", sessionUid: "later", position: 1, resultStatus: 3 });
+    await repo.commitLap(lap({ lapTimeMs: 90_000, finishedAt: 1 }));
+    const incoming = {
+      sessions: [
+        {
+          id: 4,
+          game: "f1-25" as const,
+          sessionUid: "restored",
+          trackId: 16,
+          sessionType: 15,
+          gameMode: 1,
+          startedAt: 50,
+          resultStatus: 2,
+          position: 6,
+        },
+      ],
+      laps: [
+        {
+          id: 7,
+          sessionId: 4,
+          game: "f1-25" as const,
+          trackId: 16,
+          condition: "wet" as const,
+          lapNumber: 2,
+          lapTimeMs: 95_000,
+          sector1Ms: 30_000,
+          sector2Ms: 32_000,
+          sector3Ms: 33_000,
+          teamId: 1,
+          tyreCompound: 17,
+          trackTempC: 18,
+          airTempC: 16,
+          setup: { rearWing: 4 },
+          finishedAt: 80,
+        },
+      ],
+      traces: [
+        {
+          lapId: 7,
+          samples: [
+            { distanceM: 10, throttle: 0, brake: 1, speedKph: 80, elapsedMs: 400, gear: 2, drs: 0, ers: 0 },
+          ],
+        },
+      ],
+    };
+
+    await repo.replaceAll(incoming);
+
+    expect(await repo.readAll()).toEqual(incoming);
+    const next = await repo.commitLap(
+      lap({
+        lapTimeMs: 96_000,
+        finishedAt: 90,
+        session: { game: "f1-26", sessionUid: "later", trackId: 11, sessionType: 18, gameMode: 5 },
+      }),
+    );
+    expect(next).toBe(8);
+    const sessions = await repo.listSessions();
+    expect(sessions.find((row) => row.trackId === 11)?.position).toBe(0);
+  });
+
   it("can keep the Fastest Lap on each track", async () => {
     const repo = new MemoryLapRepository();
     await repo.commitLap(lap({ lapTimeMs: 90_000, finishedAt: 1 }));

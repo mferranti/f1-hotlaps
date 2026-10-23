@@ -37,7 +37,7 @@ export class MemoryLapRepository implements LapRepository {
 
   async commitLap(lap: CompletedLap, traceRetention: TraceRetention = "fastest-latest"): Promise<number> {
     const session = this.findOrCreateSession(lap);
-    const id = this.laps.length + 1;
+    const id = this.nextId(this.laps);
     this.laps.push({
       id,
       sessionId: session.id,
@@ -163,6 +163,15 @@ export class MemoryLapRepository implements LapRepository {
     return bytes;
   }
 
+  async replaceAll(data: StoredData): Promise<void> {
+    this.sessions = data.sessions.map((session) => ({ ...session }));
+    this.laps = data.laps.map((lap) => ({ ...lap, setup: { ...lap.setup } }));
+    this.traces = new Map(
+      data.traces.map((trace) => [trace.lapId, trace.samples.map((sample) => ({ ...sample }))]),
+    );
+    this.pendingResults.clear();
+  }
+
   async readAll(): Promise<StoredData> {
     return {
       sessions: this.sessions.map((session) => ({ ...session })),
@@ -180,7 +189,7 @@ export class MemoryLapRepository implements LapRepository {
     const pending = this.pendingResults.get(`${game}|${sessionUid}`);
     this.pendingResults.delete(`${game}|${sessionUid}`);
     const session: StoredSession = {
-      id: this.sessions.length + 1,
+      id: this.nextId(this.sessions),
       game,
       sessionUid,
       trackId,
@@ -192,6 +201,10 @@ export class MemoryLapRepository implements LapRepository {
     };
     this.sessions.push(session);
     return session;
+  }
+
+  private nextId(rows: readonly { id: number }[]): number {
+    return rows.reduce((max, row) => Math.max(max, row.id), 0) + 1;
   }
 
   private session(id: number): StoredSession {

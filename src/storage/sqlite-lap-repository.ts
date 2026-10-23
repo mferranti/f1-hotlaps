@@ -265,6 +265,60 @@ export class SqliteLapRepository implements LapRepository {
     return (pages?.page_count ?? 0) * (size?.page_size ?? 0);
   }
 
+  async replaceAll(data: StoredData): Promise<void> {
+    const db = await this.open();
+    await db.withTransactionAsync(async () => {
+      await db.runAsync("DELETE FROM traces");
+      await db.runAsync("DELETE FROM laps");
+      await db.runAsync("DELETE FROM sessions");
+      for (const session of data.sessions) {
+        await db.runAsync(
+          `INSERT INTO sessions (
+            id, game, session_uid, track_id, session_type, game_mode, started_at, result_status, position
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          session.id,
+          session.game,
+          session.sessionUid,
+          session.trackId,
+          session.sessionType,
+          session.gameMode,
+          session.startedAt,
+          session.resultStatus,
+          session.position,
+        );
+      }
+      for (const lap of data.laps) {
+        await db.runAsync(
+          `INSERT INTO laps (
+            id, session_id, game, track_id, condition, lap_number, lap_time_ms,
+            sector1_ms, sector2_ms, sector3_ms, team_id, tyre_compound, track_temp_c, air_temp_c,
+            setup_json, finished_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          lap.id,
+          lap.sessionId,
+          lap.game,
+          lap.trackId,
+          lap.condition,
+          lap.lapNumber,
+          lap.lapTimeMs,
+          lap.sector1Ms,
+          lap.sector2Ms,
+          lap.sector3Ms,
+          lap.teamId,
+          lap.tyreCompound,
+          lap.trackTempC,
+          lap.airTempC,
+          JSON.stringify(lap.setup),
+          lap.finishedAt,
+        );
+      }
+      for (const trace of data.traces) {
+        await db.runAsync("INSERT INTO traces (lap_id, samples) VALUES (?, ?)", trace.lapId, encodeTrace(trace.samples));
+      }
+    });
+    this.pendingResults.clear();
+  }
+
   async readAll(): Promise<StoredData> {
     const db = await this.open();
     const sessions = await db.getAllAsync<StoredSessionRow>("SELECT * FROM sessions ORDER BY id");
