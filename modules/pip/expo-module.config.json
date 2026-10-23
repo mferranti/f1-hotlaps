@@ -1,0 +1,5 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": { "modules": ["PipModule"] },
+  "android": { "modules": ["expo.modules.pip.PipModule"] }
+}

@@ -28,12 +28,16 @@ Read them in tests with `readPacketFile(path)` from `scripts/packet-file.ts`; it
 
 That is 14 files: `f1-25-clean-lap.bin.gz` … `f1-26-two-laps-new-fastest.bin.gz`.
 
+Cuts from `fixtures/captures/f1-25.bin` and `f1-26.bin` (Spa). Both files arrived as packet format 2025 — set the game's UDP format to 2026 when recapturing F1 26. There is no `f1-26-wet-lap` yet; Wet Laps are in the F1 25 capture.
+
 ## Producing a fixture
 
 1. Capture a full session into `fixtures/captures/` (gitignored). Point the Game's UDP telemetry at the IP address and port it prints. Stop with Ctrl+C.
 
    ```sh
    pnpm packets capture --port 20777 --out fixtures/captures/f1-26-monza.bin
+   # Also feed the phone app (LAN address from Config):
+   pnpm packets capture --forward 192.168.1.20:20777 --out fixtures/captures/f1-26-monza.bin
    ```
 
 2. Find the time range of the scenario. Replay the capture into the app (or watch the clock while capturing) and note the start and end in seconds since the first Packet.

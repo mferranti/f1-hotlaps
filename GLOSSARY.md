@@ -63,5 +63,5 @@ The most recent Lap for one Game, track, and Condition that is not the Fastest.
 _Avoid_: Last, previous, newest
 
 **Trace**:
-The throttle, brake, speed, and time delta along a Lap. Only the Fastest and the Latest have one.
+Throttle, brake, speed, gear, DRS, ERS, and time delta along a Lap. By default every Lap keeps one; Config can keep Traces only on the Fastest and the Latest.
 _Avoid_: Telemetry log, recording, replay

@@ -21,7 +21,7 @@ Node 24 (`.nvmrc`), pnpm via Corepack.
 - Import from `src/` with the `@/` alias (`@/domain/format`). Jest resolves it from `tsconfig.json`.
 - Tests sit next to the code as `*.test.ts(x)`. Never put tests in `app/`; expo-router would treat them as routes.
 - Every dependency is already installed. Do not edit `package.json`; ask first if something is missing.
-- Native config lives in `app.config.ts` (add plugins there, e.g. `./modules/pip/app.plugin.js`).
+- Native config lives in `app.config.ts` (add plugins there, e.g. `./modules/pip/app.plugin.js`). Local modules need a podspec and Android `build.gradle`; see `.cursor/rules/native-modules.mdc`.
 
 ## Folder ownership
 

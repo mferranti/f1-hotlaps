@@ -18,10 +18,12 @@ import {
 const DEFAULT_PORT = 20777;
 
 const USAGE = `Usage:
-  pnpm packets capture [--port 20777] [--out fixtures/captures/<timestamp>.bin]
+  pnpm packets capture [--port 20777] [--out fixtures/captures/<timestamp>.bin] [--forward <host:port>]
   pnpm packets replay <file> [--to 127.0.0.1:20777] [--speed 1]
   pnpm packets trim <file> [--from 0s] [--to <end>] --out fixtures/packets/<name>.bin.gz
 
+capture writes every Packet the Game sends (all packet ids). --forward copies each
+Packet to another host (the phone running the app) so you can record and receive at once.
 Durations: 61.2s, 1500ms, 2m3.5s, or bare seconds. Replay and trim read .gz files too.
 trim keeps Session, LapData, Event, CarSetups, CarTelemetry, CarStatus, SessionHistory
 and gzips the output when --out ends in .gz.`;
@@ -52,10 +54,15 @@ function defaultCapturePath(): string {
 function capture(args: string[]): void {
   const { values } = parseArgs({
     args,
-    options: { port: { type: "string" }, out: { type: "string" } },
+    options: {
+      port: { type: "string" },
+      out: { type: "string" },
+      forward: { type: "string" },
+    },
   });
   const port = parsePort(values.port ?? String(DEFAULT_PORT));
   const out = values.out ?? defaultCapturePath();
+  const forward = values.forward ? parseTarget(values.forward) : undefined;
   mkdirSync(dirname(out), { recursive: true });
   const fd = openSync(out, "w");
 
@@ -68,6 +75,7 @@ function capture(args: string[]): void {
     startMs ??= now;
     writeSync(fd, encodeRecord({ offsetMs: Math.round(now - startMs), bytes: msg }));
     count += 1;
+    if (forward) socket.send(msg, forward.port, forward.host);
   });
   socket.on("error", (error) => {
     console.error(error.message);
@@ -98,6 +106,7 @@ function capture(args: string[]): void {
         ? `Set the Game's UDP IP address to: ${addresses.join(" or ")} (port ${port})`
         : "No LAN IPv4 address found; is Wi-Fi or Ethernet connected?",
     );
+    if (forward) console.log(`Forwarding each Packet to ${forward.host}:${forward.port}`);
     console.log("Press Ctrl+C to stop.");
   });
 }

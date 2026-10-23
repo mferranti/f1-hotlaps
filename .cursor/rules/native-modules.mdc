@@ -1,0 +1,16 @@
+---
+description: Avoid Expo local-module autolink, CocoaPods, and NSObject pitfalls
+alwaysApply: true
+---
+
+# Native Expo modules
+
+Local modules in `modules/` are skipped unless autolinking can see them. Each module needs `ios/<Name>.podspec` and `android/build.gradle`. Confirm with `pnpm exec expo-modules-autolinking resolve --json` — the package name must appear.
+
+`pnpm ios` / `expo run:ios` often skip CocoaPods. After adding or changing native files, run `LANG=en_US.UTF-8 pod install` in `ios/` (CocoaPods needs UTF-8). Then rebuild the native app. Metro reload is not enough; `requireOptionalNativeModule` returning a JS stub means the class is not in this binary.
+
+An Expo `Module` is not `NSObject`. Do not make it a UIKit or AVKit delegate. Put `NSObjectProtocol` conformances on a separate `NSObject` helper (e.g. a session object the module owns).
+
+`OnDestroy` and JS `AsyncFunction` bodies can run off the main thread. Do not add/remove views, change frames, or stop AVKit from that thread — hop to `DispatchQueue.main.async` first. `DispatchQueue.main.sync` during destroy can deadlock. Capture the session strongly in the async block so it is not deallocated before teardown.
+
+Do not edit or commit generated `ios/` and `android/` except by running `pod install`. Native config belongs in `app.config.ts` and `modules/*/app.plugin.js`.

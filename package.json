@@ -25,6 +25,8 @@
     "dev": "expo start --dev-client --lan",
     "ios": "expo run:ios",
     "android": "expo run:android",
+    "preview:ios": "expo run:ios --configuration Release",
+    "preview:android": "expo run:android --variant release",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "jest",
