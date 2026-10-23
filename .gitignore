@@ -1,8 +1,8 @@
 node_modules/
 
-# Continuous native generation: ios/ and android/ come from `expo prebuild`
-ios/
-android/
+# Continuous native generation: only the repo-root folders come from `expo prebuild`
+/ios/
+/android/
 
 .expo/
 expo-env.d.ts
