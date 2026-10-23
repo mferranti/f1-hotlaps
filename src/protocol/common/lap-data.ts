@@ -2,6 +2,7 @@ import { ByteReader } from "../byte-reader";
 import { HEADER_SIZE } from "../header";
 import type { GameLayout } from "../layout";
 import type { DecodedBody, LapData } from "../types";
+import { readPlayerCars } from "./player-cars";
 
 export const LAP_DATA_CAR_BYTES = 57;
 
@@ -9,13 +10,13 @@ export function lapDataPacketSize(layout: GameLayout): number {
   return HEADER_SIZE + layout.numCars * LAP_DATA_CAR_BYTES + 2;
 }
 
-export function decodeLapData(bytes: Uint8Array, layout: GameLayout): DecodedBody {
+export function decodeLapData(bytes: Uint8Array, layout: GameLayout, playerCarIndex: number): DecodedBody {
   const expected = lapDataPacketSize(layout);
   if (bytes.byteLength < expected) {
     throw new RangeError(`Lap Data Packet is ${bytes.byteLength} bytes; expected ${expected}`);
   }
   const r = new ByteReader(bytes, HEADER_SIZE);
-  const cars = r.array(layout.numCars, () => readLapData(r));
+  const cars = readPlayerCars(r, layout.numCars, playerCarIndex, LAP_DATA_CAR_BYTES, () => readLapData(r));
   return { kind: "lapData", cars };
 }
 

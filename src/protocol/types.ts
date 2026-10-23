@@ -106,7 +106,7 @@ export type DecodedBody =
 
 export type DecodedPacket = DecodedBody & { header: PacketHeader };
 
-export type PacketDecoder = (bytes: Uint8Array) => DecodedBody;
+export type PacketDecoder = (bytes: Uint8Array, playerCarIndex: number) => DecodedBody;
 
 export interface GameDecoder {
   packetFormat: number;

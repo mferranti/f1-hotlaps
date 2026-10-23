@@ -9,7 +9,7 @@ const HISTORY_PREFIX_BYTES = 7;
 export const SESSION_HISTORY_PACKET_BYTES =
   HEADER_SIZE + HISTORY_PREFIX_BYTES + MAX_LAPS_IN_HISTORY * LAP_HISTORY_BYTES + 8 * 3;
 
-export function decodeSessionHistory(bytes: Uint8Array): DecodedBody {
+export function decodeSessionHistory(bytes: Uint8Array, playerCarIndex: number): DecodedBody {
   if (bytes.byteLength < SESSION_HISTORY_PACKET_BYTES) {
     throw new RangeError(
       `Session History Packet is ${bytes.byteLength} bytes; expected ${SESSION_HISTORY_PACKET_BYTES}`,
@@ -18,6 +18,9 @@ export function decodeSessionHistory(bytes: Uint8Array): DecodedBody {
   const r = new ByteReader(bytes, HEADER_SIZE);
   const carIdx = r.uint8();
   const numLaps = r.uint8();
+  if (carIdx !== playerCarIndex) {
+    return { kind: "sessionHistory", data: { carIdx, numLaps, laps: [] } };
+  }
   r.skip(5); // tyre stints and best-lap numbers
   const entries = r.array(MAX_LAPS_IN_HISTORY, () => readLapHistory(r));
   return {

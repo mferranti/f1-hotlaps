@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { usePacketActivity } from "@/activity/use-packet-activity";
-import { lapRepository, subscribeActivity } from "@/capture/runtime";
+import { lapRepository, subscribeLaps } from "@/capture/runtime";
 import { formatLapTime } from "@/domain/format";
 import { formatSpeed } from "@/domain/units";
 import { useLiveCar } from "@/live/use-live-car";
@@ -49,7 +49,7 @@ export default function MainScreen() {
   useFocusEffect(
     useCallback(() => {
       void loadRecent();
-      return subscribeActivity(() => {
+      return subscribeLaps(() => {
         void loadRecent();
       });
     }, [loadRecent]),

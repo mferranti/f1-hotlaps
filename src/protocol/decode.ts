@@ -23,5 +23,5 @@ export function decodePacket(bytes: Uint8Array): DecodedPacket {
   const game = games.get(header.packetFormat);
   if (!game) throw new UnsupportedPacketFormatError(header.packetFormat);
   const decode = game.decoders[header.packetId];
-  return { header, ...(decode ? decode(bytes) : { kind: "undecoded" }) };
+  return { header, ...(decode ? decode(bytes, header.playerCarIndex) : { kind: "undecoded" }) };
 }

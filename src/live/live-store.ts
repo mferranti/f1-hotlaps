@@ -18,9 +18,9 @@ type Listener = () => void;
 let car: LiveCar | null = null;
 const listeners = new Set<Listener>();
 
-export function setLiveCar(next: LiveCar | null): void {
+export function setLiveCar(next: LiveCar | null, notify = true): void {
   car = next;
-  listeners.forEach((listen) => listen());
+  if (notify) listeners.forEach((listen) => listen());
 }
 
 export function getLiveCar(): LiveCar | null {

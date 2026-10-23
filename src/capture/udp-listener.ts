@@ -1,6 +1,6 @@
 export const DEFAULT_TELEMETRY_PORT = 20777;
 
-export type StopListening = () => void;
+export type StopListening = () => void | Promise<void>;
 
 /**
  * Listens with react-native-udp. Loaded only when capture starts so Expo Go can
@@ -12,6 +12,13 @@ export async function listenUdp(port: number, onPacket: (bytes: Uint8Array) => v
   return new Promise((resolve, reject) => {
     socket.once("error", reject);
     socket.on("message", (msg: Uint8Array) => onPacket(msg));
-    socket.bind(port, () => resolve(() => socket.close()));
+    socket.bind(port, () =>
+      resolve(
+        () =>
+          new Promise<void>((done) => {
+            socket.close(() => done());
+          }),
+      ),
+    );
   });
 }

@@ -1,5 +1,5 @@
 export { decodePacket, SUPPORTED_PACKET_FORMATS, UnsupportedPacketFormatError } from "./decode";
-export { decodeHeader, HEADER_SIZE, PacketId, type PacketHeader } from "./header";
+export { decodeHeader, peekPacketFormat, peekPacketId, HEADER_SIZE, PacketId, type PacketHeader } from "./header";
 export { F1_25_PACKET_FORMAT, layout as f1_25Layout } from "./f1-25";
 export { F1_26_PACKET_FORMAT, layout as f1_26Layout } from "./f1-26";
 export { trackName, trackFlag, trackLabel, knownTrackIds } from "./tracks";

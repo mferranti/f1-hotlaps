@@ -2,6 +2,7 @@ import { ByteReader } from "../byte-reader";
 import { HEADER_SIZE } from "../header";
 import type { GameLayout } from "../layout";
 import type { CarTelemetryData, DecodedBody } from "../types";
+import { readPlayerCars } from "./player-cars";
 
 export function carTelemetryCarBytes(layout: GameLayout): number {
   return layout.engineTemperature === "uint16" ? 60 : 59;
@@ -11,13 +12,15 @@ export function carTelemetryPacketSize(layout: GameLayout): number {
   return HEADER_SIZE + layout.numCars * carTelemetryCarBytes(layout) + 3;
 }
 
-export function decodeCarTelemetry(bytes: Uint8Array, layout: GameLayout): DecodedBody {
+export function decodeCarTelemetry(bytes: Uint8Array, layout: GameLayout, playerCarIndex: number): DecodedBody {
   const expected = carTelemetryPacketSize(layout);
   if (bytes.byteLength < expected) {
     throw new RangeError(`Car Telemetry Packet is ${bytes.byteLength} bytes; expected ${expected}`);
   }
   const r = new ByteReader(bytes, HEADER_SIZE);
-  const cars = r.array(layout.numCars, () => readTelemetry(r, layout));
+  const cars = readPlayerCars(r, layout.numCars, playerCarIndex, carTelemetryCarBytes(layout), () =>
+    readTelemetry(r, layout),
+  );
   return { kind: "carTelemetry", cars };
 }
 

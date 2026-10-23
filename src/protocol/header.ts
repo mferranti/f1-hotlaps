@@ -41,6 +41,22 @@ export interface PacketHeader {
   secondaryPlayerCarIndex: number;
 }
 
+/** Packet format is the first uint16; used when we only need a format check. */
+export function peekPacketFormat(bytes: Uint8Array): number {
+  if (bytes.byteLength < 2) {
+    throw new RangeError(`Packet is ${bytes.byteLength} bytes; the header needs ${HEADER_SIZE}`);
+  }
+  return bytes[0]! | (bytes[1]! << 8);
+}
+
+/** packetId sits at byte 6 of every header. */
+export function peekPacketId(bytes: Uint8Array): number {
+  if (bytes.byteLength < 7) {
+    throw new RangeError(`Packet is ${bytes.byteLength} bytes; the header needs ${HEADER_SIZE}`);
+  }
+  return bytes[6]!;
+}
+
 /** The header layout is identical in F1 25 and F1 26. */
 export function decodeHeader(bytes: Uint8Array): PacketHeader {
   if (bytes.byteLength < HEADER_SIZE) {

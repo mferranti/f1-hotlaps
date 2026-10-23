@@ -220,6 +220,16 @@ describe("decoded bodies", () => {
       lapValid: true,
     });
 
+    const otherHistory = packetWithHeader(SESSION_HISTORY_PACKET_BYTES, {
+      packetFormat: format,
+      packetId: PacketId.SessionHistory,
+      playerCarIndex: player,
+    });
+    otherHistory.uint8(0).uint8(2);
+    const otherHistoryPacket = decodePacket(otherHistory.bytes);
+    if (otherHistoryPacket.kind !== "sessionHistory") throw new Error(otherHistoryPacket.kind);
+    expect(otherHistoryPacket.data.laps).toEqual([]);
+
     const eventPacket = decodePacket(flashback.bytes);
     if (eventPacket.kind !== "event") throw new Error(eventPacket.kind);
     expect(eventPacket.event).toEqual({

@@ -15,13 +15,13 @@ import { decodeSessionHistory } from "./session-history";
 export function decodersFor(layout: GameLayout): GameDecoder["decoders"] {
   return {
     [PacketId.Session]: decodeSession,
-    [PacketId.LapData]: (bytes) => decodeLapData(bytes, layout),
+    [PacketId.LapData]: (bytes, player) => decodeLapData(bytes, layout, player),
     [PacketId.Event]: decodeEvent,
     [PacketId.Participants]: (bytes) => decodeParticipants(bytes, layout),
     [PacketId.CarSetups]: (bytes) => decodeCarSetups(bytes, layout),
-    [PacketId.CarTelemetry]: (bytes) => decodeCarTelemetry(bytes, layout),
-    [PacketId.CarStatus]: (bytes) => decodeCarStatus(bytes, layout),
-    [PacketId.SessionHistory]: decodeSessionHistory,
+    [PacketId.CarTelemetry]: (bytes, player) => decodeCarTelemetry(bytes, layout, player),
+    [PacketId.CarStatus]: (bytes, player) => decodeCarStatus(bytes, layout, player),
+    [PacketId.SessionHistory]: (bytes, player) => decodeSessionHistory(bytes, player),
     [PacketId.FinalClassification]: (bytes) => decodeFinalClassification(bytes, layout),
   };
 }

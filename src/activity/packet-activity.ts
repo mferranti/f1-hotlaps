@@ -1,4 +1,4 @@
-import { decodeHeader } from "@/protocol/header";
+import { peekPacketFormat } from "@/protocol/header";
 import { SUPPORTED_PACKET_FORMATS } from "@/protocol/decode";
 
 export const ACTIVITY_WINDOW = 60;
@@ -34,7 +34,7 @@ export class PacketActivity {
     this.lastPacketAt = now;
     this.everReceived = true;
     try {
-      const format = decodeHeader(bytes).packetFormat;
+      const format = peekPacketFormat(bytes);
       if (!SUPPORTED_PACKET_FORMATS.includes(format)) {
         this.unsupportedFormat = format;
         this.status = "unsupported";
