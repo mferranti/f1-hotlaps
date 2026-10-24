@@ -10,7 +10,7 @@ import {
   recordedTeamId,
   UnsupportedPacketFormatError,
 } from "@/protocol";
-import { LapRecorder } from "@/recording/lap-recorder";
+import { LapRecorder, storesLap } from "@/recording/lap-recorder";
 import type { LapRepository } from "@/storage/lap-repository";
 import { MemoryLapRepository } from "@/storage/memory-lap-repository";
 import { SettingsRepository, type KvStore } from "@/storage/settings-repository";
@@ -162,7 +162,9 @@ async function listen(port: number): Promise<void> {
 }
 
 async function commit(lap: CompletedLap): Promise<void> {
-  const retention = (await settings?.get())?.traceRetention ?? "all";
+  const current = await settings?.get();
+  if (!storesLap(lap.valid, current?.storeInvalidLaps ?? true)) return;
+  const retention = current?.traceRetention ?? "all";
   await laps.commitLap(lap, retention);
   notifyLaps();
 }

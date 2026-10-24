@@ -15,6 +15,8 @@ export interface Settings {
   speedUnit: SpeedUnit;
   temperatureUnit: TemperatureUnit;
   traceRetention: TraceRetention;
+  /** When true, Invalid Laps are stored. On by default. */
+  storeInvalidLaps: boolean;
 }
 
 export function validatePort(port: number): boolean {
@@ -26,6 +28,7 @@ const KEYS = {
   speedUnit: "units.speed",
   temperatureUnit: "units.temperature",
   traceRetention: "traces.retention",
+  storeInvalidLaps: "laps.storeInvalid",
 } as const;
 
 export class SettingsRepository {
@@ -37,6 +40,7 @@ export class SettingsRepository {
       speedUnit: parseSpeed(await this.kv.getItem(KEYS.speedUnit)),
       temperatureUnit: parseTemperature(await this.kv.getItem(KEYS.temperatureUnit)),
       traceRetention: parseRetention(await this.kv.getItem(KEYS.traceRetention)),
+      storeInvalidLaps: parseStoreInvalid(await this.kv.getItem(KEYS.storeInvalidLaps)),
     };
   }
 
@@ -56,6 +60,10 @@ export class SettingsRepository {
   async setTraceRetention(retention: TraceRetention): Promise<void> {
     await this.kv.setItem(KEYS.traceRetention, retention);
   }
+
+  async setStoreInvalidLaps(store: boolean): Promise<void> {
+    await this.kv.setItem(KEYS.storeInvalidLaps, store ? "true" : "false");
+  }
 }
 
 function parsePort(value: string | null): number {
@@ -74,4 +82,8 @@ function parseTemperature(value: string | null): TemperatureUnit {
 
 function parseRetention(value: string | null): TraceRetention {
   return value === "fastest-latest" ? "fastest-latest" : "all";
+}
+
+function parseStoreInvalid(value: string | null): boolean {
+  return value !== "false";
 }

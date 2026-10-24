@@ -34,10 +34,11 @@ export default function MainScreen() {
     try {
       const [allLaps, sessions] = await Promise.all([
         lapRepository().listLaps({ sort: "newest" }),
-        lapRepository().listSessions(),
+        lapRepository().listSessions({ validOnly: true }),
       ]);
-      setLaps(allLaps);
-      setRecentLaps(allLaps.slice(0, RECENT));
+      const visible = allLaps.filter((lap) => lap.valid);
+      setLaps(visible);
+      setRecentLaps(visible.slice(0, RECENT));
       setRecentSessions(sessions.slice(0, RECENT));
     } catch {
       setLaps([]);

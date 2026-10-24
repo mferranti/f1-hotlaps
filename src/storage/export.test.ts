@@ -27,6 +27,7 @@ const stored: StoredData = {
       sector1Ms: 25_000,
       sector2Ms: 27_000,
       sector3Ms: 29_234,
+      valid: true,
       teamId: 8,
       tyreCompound: 16,
       trackTempC: 40.5,
@@ -54,6 +55,22 @@ describe("export", () => {
     expect(body).not.toMatch(/\n/);
     expect(body).toContain(`"formatVersion":${EXPORT_FORMAT_VERSION}`);
     expect(parseExport(body)).toEqual(stored);
+  });
+
+  it("keeps an Invalid Lap marked invalid", () => {
+    const invalid: StoredData = {
+      ...stored,
+      laps: [{ ...stored.laps[0]!, valid: false }],
+    };
+
+    expect(parseExport(exportBody(invalid, exportedAt)).laps[0]?.valid).toBe(false);
+  });
+
+  it("reads an older format 1 Lap with no valid field as Valid", () => {
+    const body = JSON.parse(exportBody(stored, exportedAt)) as { laps: { valid?: boolean }[] };
+    delete body.laps[0]!.valid;
+
+    expect(parseExport(JSON.stringify(body)).laps[0]?.valid).toBe(true);
   });
 
   it("reads a pretty-printed format 1 file", () => {

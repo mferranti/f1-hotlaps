@@ -17,7 +17,7 @@ export function LapsTable({
   peers?: readonly LapSummary[];
   showLapNumber?: boolean;
 }) {
-  const colorPeers = peers ?? laps;
+  const colorPeers = (peers ?? laps).filter((peer) => peer.valid);
   return (
     <View>
       <View style={styles.headerRow}>
@@ -33,7 +33,7 @@ export function LapsTable({
       {laps.length === 0 ? <Text style={styles.muted}>No Laps yet</Text> : null}
       {laps.map((lap) => (
         <Link key={lap.id} href={`/laps/${lap.id}`} asChild>
-          <Pressable style={styles.dataRow}>
+          <Pressable style={[styles.dataRow, lap.valid ? null : styles.invalidRow]}>
             {showLapNumber ? (
               <Text style={[styles.cell, styles.colLap]}>{lap.lapNumber}</Text>
             ) : null}
@@ -88,6 +88,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     alignItems: "center",
   },
+  invalidRow: { opacity: 0.7 },
   head: { color: colors.muted, fontSize: 11, fontWeight: "700" },
   cell: { color: colors.text, fontSize: 12 },
   colLap: { width: 28 },

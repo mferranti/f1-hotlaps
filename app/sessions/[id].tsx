@@ -11,12 +11,14 @@ import { isRaceSession, sessionTypeName } from "@/protocol/session-types";
 import { teamName } from "@/protocol/teams";
 import { trackFlag, trackName } from "@/protocol/tracks";
 import type { SessionDetail } from "@/storage/lap-repository";
+import { CheckRow } from "@/ui/CheckRow";
 import { LapsTable } from "@/ui/LapsTable";
 import { colors } from "@/ui/theme";
 
 export default function SessionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [session, setSession] = useState<SessionDetail | null>(null);
+  const [hideInvalid, setHideInvalid] = useState(true);
 
   useEffect(() => {
     void lapRepository()
@@ -32,6 +34,7 @@ export default function SessionDetailScreen() {
     );
   }
 
+  const shown = hideInvalid ? session.laps.filter((lap) => lap.valid) : session.laps;
   const result = sessionResultLabel(session, isRaceSession(session.sessionType));
 
   return (
@@ -48,8 +51,8 @@ export default function SessionDetailScreen() {
         <Fact label="Condition" value={sessionConditionLabel(session.laps)} />
         <Fact label="Started" value={formatWhen(session.startedAt)} />
         <Fact label="Ended" value={formatWhen(session.finishedAt)} />
-        <Fact label="Laps" value={String(session.lapCount)} />
-        <Fact label="Fastest" value={session.lapCount === 0 ? "-" : formatLapTime(session.fastestLapTimeMs)} />
+        <Fact label="Laps" value={String(shown.length)} />
+        <Fact label="Fastest" value={session.fastestLapTimeMs === 0 ? "-" : formatLapTime(session.fastestLapTimeMs)} />
         {result ? <Fact label="Result" value={result} /> : null}
         {session.lapCount > 0 ? (
           <>
@@ -59,7 +62,12 @@ export default function SessionDetailScreen() {
         ) : null}
       </View>
       <Text style={styles.section}>Laps</Text>
-      <LapsTable laps={session.laps} showLapNumber />
+      <CheckRow
+        label="Hide invalid Laps"
+        checked={hideInvalid}
+        onPress={() => setHideInvalid((value) => !value)}
+      />
+      <LapsTable laps={shown} peers={session.laps} showLapNumber />
     </ScrollView>
   );
 }

@@ -19,6 +19,7 @@ const DEFAULTS: Settings = {
   speedUnit: "kph",
   temperatureUnit: "c",
   traceRetention: "all",
+  storeInvalidLaps: true,
 };
 
 export default function ConfigScreen() {
@@ -98,11 +99,11 @@ export default function ConfigScreen() {
         </View>
       </View>
 
-      <Text style={styles.kicker}>Traces</Text>
+      <Text style={styles.kicker}>Data</Text>
       <View style={styles.card}>
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.title}>Keep every Trace</Text>
+            <Text style={styles.title}>Keep every lap telemetry</Text>
             <Text style={styles.muted}>
               {keepAllTraces
                 ? "Every Lap keeps a Trace. This uses more storage: About 2 MB for 100 Laps on a typical track."
@@ -117,12 +118,28 @@ export default function ConfigScreen() {
               void settings.setTraceRetention(next);
             }}
             trackColor={{ true: colors.accent }}
-            accessibilityLabel="Keep every trace"
+            accessibilityLabel="Keep every lap telemetry"
+          />
+        </View>
+        <View style={styles.divider} />
+        <View style={styles.row}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>Store invalid Laps</Text>
+            <Text style={styles.muted}>
+              {draft.storeInvalidLaps ? "Invalid Laps are kept" : "Invalid Laps are not stored"}
+            </Text>
+          </View>
+          <Switch
+            value={draft.storeInvalidLaps}
+            onValueChange={(on) => {
+              setDraft({ ...draft, storeInvalidLaps: on });
+              void settings.setStoreInvalidLaps(on);
+            }}
+            trackColor={{ true: colors.accent }}
+            accessibilityLabel="Store invalid laps"
           />
         </View>
       </View>
-
-      <Text style={styles.kicker}>Data</Text>
       <Text style={styles.muted}>Using {formatMegabytes(usedBytes)}</Text>
       <Pressable style={styles.action} onPress={() => void exportLaps(lapRepository())}>
         <Text style={styles.actionText}>Export</Text>

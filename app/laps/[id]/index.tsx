@@ -64,10 +64,11 @@ export default function LapDetailScreen() {
   const trace = lap.trace;
   const delta = trace && fastest ? deltaByDistance(trace, fastest.samples) : [];
   const overlay = compare && fastest ? fastest.samples : null;
-  const fastestLap = peers.find((peer) => peer.role === "fastest") ?? lap;
+  const validPeers = peers.filter((peer) => peer.valid);
+  const fastestLap = validPeers.find((peer) => peer.role === "fastest") ?? lap;
   const vsFastest = compareToFastest(lap, fastestLap);
-  const thisSectors = sectorColors(lap, peers);
-  const fastestSectors = sectorColors(fastestLap, peers);
+  const thisSectors = sectorColors(lap, validPeers);
+  const fastestSectors = sectorColors(fastestLap, validPeers);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ padding: 16, gap: 14 }}>
@@ -77,12 +78,13 @@ export default function LapDetailScreen() {
         sector1Ms={lap.sector1Ms}
         sector2Ms={lap.sector2Ms}
         sector3Ms={lap.sector3Ms}
-        colors={sectorColors(lap, peers)}
+        colors={sectorColors(lap, validPeers)}
         large
       />
       <Text style={styles.muted}>
         {teamName(lap.teamId)} · {gameModeName(lap.gameMode)} · {lap.condition === "wet" ? "Wet" : "Dry"} ·{" "}
         {lap.game === "f1-26" ? "F1 26" : "F1 25"}
+        {lap.valid ? "" : " · Invalid"}
       </Text>
       <Text style={styles.muted}>
         Track {formatTemperature(lap.trackTempC, "c")} · air {formatTemperature(lap.airTempC, "c")}

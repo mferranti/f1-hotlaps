@@ -9,6 +9,7 @@ function lap(overrides: Partial<CompletedLap> & Pick<CompletedLap, "lapTimeMs" |
     sector1Ms: 25_000,
     sector2Ms: 27_000,
     sector3Ms: 29_000,
+    valid: true,
     condition: "dry",
     teamId: 8,
     tyreCompound: 16,
@@ -155,6 +156,7 @@ describe("MemoryLapRepository", () => {
           sector1Ms: 30_000,
           sector2Ms: 32_000,
           sector3Ms: 33_000,
+          valid: true,
           teamId: 1,
           tyreCompound: 17,
           trackTempC: 18,
@@ -186,6 +188,37 @@ describe("MemoryLapRepository", () => {
     expect(next).toBe(8);
     const sessions = await repo.listSessions();
     expect(sessions.find((row) => row.trackId === 11)?.position).toBe(0);
+  });
+
+  it("keeps an Invalid Lap out of Fastest and can hide it from Sessions", async () => {
+    const repo = new MemoryLapRepository();
+    const valid = await repo.commitLap(lap({ lapTimeMs: 90_000, finishedAt: 1 }));
+    const invalid = await repo.commitLap(lap({ lapTimeMs: 70_000, finishedAt: 2, lapNumber: 2, valid: false }));
+    await repo.commitLap(
+      lap({
+        lapTimeMs: 100_000,
+        finishedAt: 3,
+        valid: false,
+        session: { game: "f1-26", sessionUid: "only-invalid", trackId: 10, sessionType: 18, gameMode: 5 },
+      }),
+    );
+
+    expect((await repo.getLap(valid))?.role).toBe("fastest");
+    expect((await repo.getLap(invalid))?.role).toBeNull();
+    expect((await repo.getLap(invalid))?.valid).toBe(false);
+
+    const all = await repo.listSessions();
+    expect(all).toHaveLength(2);
+    expect(all.find((row) => row.trackId === 11)?.lapCount).toBe(2);
+    expect(all.find((row) => row.trackId === 11)?.fastestLapTimeMs).toBe(90_000);
+
+    const visible = await repo.listSessions({ validOnly: true });
+    expect(visible).toHaveLength(1);
+    expect(visible[0]?.lapCount).toBe(1);
+    expect(visible[0]?.fastestLapTimeMs).toBe(90_000);
+
+    await repo.wipeAll(true);
+    expect((await repo.listLaps({ sort: "fastest" })).map((row) => row.id)).toEqual([valid]);
   });
 
   it("can keep the Fastest Lap on each track", async () => {

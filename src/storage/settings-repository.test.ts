@@ -27,6 +27,7 @@ describe("SettingsRepository", () => {
       speedUnit: "kph",
       temperatureUnit: "c",
       traceRetention: "all",
+      storeInvalidLaps: true,
     });
   });
 
@@ -36,11 +37,13 @@ describe("SettingsRepository", () => {
     await repo.setSpeedUnit("mph");
     await repo.setTemperatureUnit("f");
     await repo.setTraceRetention("all");
+    await repo.setStoreInvalidLaps(false);
     expect(await repo.get()).toEqual({
       port: 30000,
       speedUnit: "mph",
       temperatureUnit: "f",
       traceRetention: "all",
+      storeInvalidLaps: false,
     });
   });
 

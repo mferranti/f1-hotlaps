@@ -17,6 +17,15 @@ describe("tracedLaps", () => {
     expect(tracedLaps([a, b, c, d])).toEqual({ fastestId: 3, latestId: 4 });
   });
 
+  it("skips an Invalid Lap for Fastest and Latest", () => {
+    const valid = { id: 1, lapTimeMs: 90_000, finishedAt: 1_000, valid: true };
+    const invalid = { id: 2, lapTimeMs: 70_000, finishedAt: 2_000, valid: false };
+    const later = { id: 3, lapTimeMs: 95_000, finishedAt: 3_000, valid: true };
+
+    expect(tracedLaps([valid, invalid])).toEqual({ fastestId: 1, latestId: null });
+    expect(tracedLaps([valid, invalid, later])).toEqual({ fastestId: 1, latestId: 3 });
+  });
+
   it("keeps the earlier Lap Fastest on a tie regardless of input order", () => {
     const later = { id: 7, lapTimeMs: 90_000, finishedAt: 5_000 };
     const earlier = { id: 8, lapTimeMs: 90_000, finishedAt: 1_000 };

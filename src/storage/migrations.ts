@@ -42,6 +42,9 @@ export const MIGRATIONS: readonly string[] = [
   ALTER TABLE sessions ADD COLUMN result_status INTEGER NOT NULL DEFAULT 0;
   ALTER TABLE sessions ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
   `,
+  `
+  ALTER TABLE laps ADD COLUMN valid INTEGER NOT NULL DEFAULT 1;
+  `,
 ];
 
 export interface MigratableDatabase {

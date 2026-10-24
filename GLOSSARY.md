@@ -37,8 +37,16 @@ A Session in which cars compete over a set number of laps, as opposed to practic
 _Avoid_: Career, Grand Prix
 
 **Lap**:
-A completed circuit of the track by the Player car that the Game counts as valid, with a lap time above zero.
-_Avoid_: Incomplete lap, invalid lap, sector
+A completed circuit of the track by the Player car with a lap time above zero. The Game marks each Lap Valid or Invalid.
+_Avoid_: Incomplete lap, sector
+
+**Valid**:
+A Lap the Game counts.
+_Avoid_: Clean lap, legal lap
+
+**Invalid**:
+A Lap the Game does not count, such as one with a track limit or a cut.
+_Avoid_: Deleted lap, rejected lap
 
 **Condition**:
 The track's wetness when a Lap finishes: Dry or Wet.
@@ -55,11 +63,11 @@ _Avoid_: Rain, intermediate, wet compound
 ### Traces
 
 **Fastest**:
-The Lap with the lowest lap time for one Game, track, and Condition. On a tie, the earlier Lap stays Fastest.
+The Valid Lap with the lowest lap time for one Game, track, and Condition. On a tie, the earlier Lap stays Fastest.
 _Avoid_: Best, PB, record
 
 **Latest**:
-The most recent Lap for one Game, track, and Condition that is not the Fastest.
+The most recent Valid Lap for one Game, track, and Condition that is not the Fastest.
 _Avoid_: Last, previous, newest
 
 **Trace**:

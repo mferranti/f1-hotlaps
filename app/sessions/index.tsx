@@ -6,6 +6,7 @@ import { sessionTypeName } from "@/protocol/session-types";
 import { teamName } from "@/protocol/teams";
 import { trackFlag, trackName } from "@/protocol/tracks";
 import type { SessionSummary } from "@/storage/lap-repository";
+import { CheckRow } from "@/ui/CheckRow";
 import { Chip } from "@/ui/Chip";
 import { SessionsTable } from "@/ui/SessionsTable";
 import { colors } from "@/ui/theme";
@@ -17,14 +18,15 @@ export default function SessionsScreen() {
   const [all, setAll] = useState<SessionSummary[]>([]);
   const [trackOpen, setTrackOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [hideInvalid, setHideInvalid] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    void lapRepository().listSessions().then(setAll);
-  }, []);
+    void lapRepository().listSessions({ validOnly: hideInvalid }).then(setAll);
+  }, [hideInvalid]);
 
   async function refresh() {
-    setAll(await lapRepository().listSessions());
+    setAll(await lapRepository().listSessions({ validOnly: hideInvalid }));
   }
 
   const sessions = useMemo(
@@ -123,6 +125,11 @@ export default function SessionsScreen() {
                 <Chip key={id} label={teamName(id)} selected={teamId === id} onPress={() => setTeamId(id)} />
               ))}
             </View>
+            <CheckRow
+              label="Hide invalid Laps"
+              checked={hideInvalid}
+              onPress={() => setHideInvalid((value) => !value)}
+            />
             <Text style={styles.muted}>Session type</Text>
             <View style={styles.chips}>
               <Chip label="All" selected={sessionType === undefined} onPress={() => setSessionType(undefined)} />

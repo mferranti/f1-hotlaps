@@ -105,8 +105,9 @@ export function sessionLapsOldestFirst<T extends { finishedAt: number; id: numbe
 export function toSessionSummary(session: StoredSession, laps: readonly StoredLap[]): SessionSummary {
   const ordered = sessionLapsOldestFirst(laps);
   const last = ordered[ordered.length - 1];
-  let fastest = last?.lapTimeMs ?? 0;
-  for (const lap of ordered) if (lap.lapTimeMs < fastest) fastest = lap.lapTimeMs;
+  const timed = ordered.filter((lap) => lap.valid);
+  let fastest = timed[0]?.lapTimeMs ?? 0;
+  for (const lap of timed) if (lap.lapTimeMs < fastest) fastest = lap.lapTimeMs;
   return {
     id: session.id,
     game: session.game,
@@ -146,6 +147,7 @@ export function toLapSummary(
     sector1Ms: lap.sector1Ms,
     sector2Ms: lap.sector2Ms,
     sector3Ms: lap.sector3Ms,
+    valid: lap.valid,
     condition: lap.condition,
     finishedAt: lap.finishedAt,
     hasTrace,
@@ -158,8 +160,9 @@ export function listSessionSummaries(
   laps: readonly StoredLap[],
   query: SessionQuery = {},
 ): SessionSummary[] {
+  const counted = query.validOnly ? laps.filter((lap) => lap.valid) : laps;
   const bySession = new Map<number, StoredLap[]>();
-  for (const lap of laps) {
+  for (const lap of counted) {
     const group = bySession.get(lap.sessionId);
     if (group) group.push(lap);
     else bySession.set(lap.sessionId, [lap]);

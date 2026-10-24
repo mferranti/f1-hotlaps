@@ -10,7 +10,7 @@ import { SESSION_HISTORY_PACKET_BYTES } from "@/protocol/common/session-history"
 import { packetWithHeader, participantsWithPlayerTeam } from "@/protocol/test/packet-builder";
 import { teamName } from "@/protocol/teams";
 import { readPacketFile } from "../../scripts/packet-file";
-import { LapRecorder } from "./lap-recorder";
+import { LapRecorder, storesLap } from "./lap-recorder";
 
 const FORMAT = 2025;
 const PLAYER = 0;
@@ -121,34 +121,56 @@ describe("LapRecorder", () => {
       ]),
     ]);
     expect(committed).toHaveLength(1);
+    expect(committed[0]?.valid).toBe(true);
     expect(committed[0]?.lapTimeMs).toBe(81_034);
     expect(committed[0]?.session.trackId).toBe(11);
     expect(committed[0]?.condition).toBe("dry");
   });
 
-  it("discards an invalid Lap, a pit Lap, a flashback, and a Lap the Game marks invalid in history", () => {
-    const recorder = new LapRecorder();
-    expect(pushAll(recorder, [session(), lap(1), lap(2, { invalid: true }), lap(3), history([{ timeMs: 1, valid: true }, { timeMs: 2, valid: true }])])).toEqual([]);
+  it("returns an Invalid Lap the Game marks during the Lap or in Session History", () => {
+    const during = new LapRecorder();
+    const fromFlag = pushAll(during, [
+      session(),
+      lap(1),
+      lap(2, { invalid: true }),
+      lap(3),
+      history([
+        { timeMs: 1, valid: true },
+        { timeMs: 2, valid: true },
+      ]),
+    ]);
+    expect(fromFlag).toHaveLength(1);
+    expect(fromFlag[0]?.valid).toBe(false);
+    expect(fromFlag[0]?.lapTimeMs).toBe(2);
 
+    const hist = new LapRecorder();
+    const fromHistory = pushAll(hist, [
+      session(),
+      lap(1),
+      lap(2),
+      lap(3, { lastMs: 81_000 }),
+      history([
+        { timeMs: 90_000, valid: true },
+        { timeMs: 81_000, valid: false },
+      ]),
+    ]);
+    expect(fromHistory).toHaveLength(1);
+    expect(fromHistory[0]?.valid).toBe(false);
+    expect(fromHistory[0]?.lapTimeMs).toBe(81_000);
+  });
+
+  it("drops a pit Lap and a flashback", () => {
     const pits = new LapRecorder();
     expect(pushAll(pits, [session(), lap(1), lap(2, { pit: true }), lap(3), history([{ timeMs: 1, valid: true }, { timeMs: 2, valid: true }])])).toEqual([]);
 
     const flash = new LapRecorder();
     expect(pushAll(flash, [session(), lap(1), lap(2), event("FLBK"), lap(3), history([{ timeMs: 1, valid: true }, { timeMs: 2, valid: true }])])).toEqual([]);
+  });
 
-    const hist = new LapRecorder();
-    expect(
-      pushAll(hist, [
-        session(),
-        lap(1),
-        lap(2),
-        lap(3, { lastMs: 81_000 }),
-        history([
-          { timeMs: 90_000, valid: true },
-          { timeMs: 81_000, valid: false },
-        ]),
-      ]),
-    ).toEqual([]);
+  it("stores an Invalid Lap only when Config keeps them", () => {
+    expect(storesLap(true, false)).toBe(true);
+    expect(storesLap(false, true)).toBe(true);
+    expect(storesLap(false, false)).toBe(false);
   });
 
   it("drops a pending Lap when the Session ends", () => {

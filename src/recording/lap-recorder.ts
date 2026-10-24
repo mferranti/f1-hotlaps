@@ -23,11 +23,14 @@ interface PendingLap {
   setup: CarSetup;
   finishedAt: number;
   trace: CompletedLap["trace"];
+  gameInvalid: boolean;
 }
 
 /**
- * Decides which finished Laps count. A Lap is stored only if this recorder saw it
- * start, it stayed valid, and Session History confirms it.
+ * Decides which finished circuits count as a Lap. The recorder must have seen
+ * the Lap start, and Session History must report a time above zero. Pit stops,
+ * flashbacks, and garage or in/out laps are dropped. A Lap the Game marks
+ * Invalid is returned with valid set to false.
  */
 export class LapRecorder {
   private sessionUid = "";
@@ -46,7 +49,8 @@ export class LapRecorder {
   private player = 0;
   private observingLap: number | null = null;
   private started = false;
-  private invalid = false;
+  private discarded = false;
+  private gameInvalid = false;
   private lastDistanceM = 0;
   private lastElapsedMs = 0;
   private lastSector1Ms = 0;
@@ -59,7 +63,8 @@ export class LapRecorder {
     this.pending = null;
     this.observingLap = null;
     this.started = false;
-    this.invalid = false;
+    this.discarded = false;
+    this.gameInvalid = false;
     this.trace = new TraceBuilder();
   }
 
@@ -70,7 +75,7 @@ export class LapRecorder {
       this.game = packet.header.packetFormat === 2026 ? "f1-26" : "f1-25";
     }
     this.player = packet.header.playerCarIndex;
-    if (packet.header.frameIdentifier < this.lastFrame) this.invalid = true;
+    if (packet.header.frameIdentifier < this.lastFrame) this.discarded = true;
     this.lastFrame = packet.header.frameIdentifier;
 
     switch (packet.kind) {
@@ -96,7 +101,7 @@ export class LapRecorder {
         }
         return undefined;
       case "carTelemetry":
-        if (this.started && !this.invalid && this.player < packet.cars.length) {
+        if (this.started && !this.discarded && this.player < packet.cars.length) {
           const car = playerCar(packet.cars, this.player);
           this.trace.add({
             lapDistanceM: this.lastDistanceM,
@@ -113,7 +118,7 @@ export class LapRecorder {
       case "lapData":
         return this.onLapData(packet, nowMs);
       case "event":
-        if (packet.event.code === "FLBK") this.invalid = true;
+        if (packet.event.code === "FLBK") this.discarded = true;
         if (packet.event.code === "SSTA" || packet.event.code === "SEND") {
           this.reset();
         }
@@ -145,7 +150,7 @@ export class LapRecorder {
 
     if (car.currentLapNum === this.observingLap) return undefined;
 
-    if (this.started && !this.invalid) {
+    if (this.started && !this.discarded) {
       this.pending = {
         lapNumber: this.observingLap,
         lapTimeMs: car.lastLapTimeMs,
@@ -159,6 +164,7 @@ export class LapRecorder {
         setup: { ...this.setup },
         finishedAt: nowMs,
         trace: this.trace.samples(),
+        gameInvalid: this.gameInvalid,
       };
     } else {
       this.pending = null;
@@ -166,7 +172,8 @@ export class LapRecorder {
 
     this.observingLap = car.currentLapNum;
     this.started = true;
-    this.invalid = false;
+    this.discarded = false;
+    this.gameInvalid = false;
     this.trace = new TraceBuilder();
     this.lastDistanceM = car.lapDistanceM;
     this.lastElapsedMs = car.currentLapTimeMs;
@@ -176,14 +183,14 @@ export class LapRecorder {
 
   private latchInvalid(car: { currentLapInvalid: boolean; pitStatus: number; driverStatus: number }): void {
     if (
-      car.currentLapInvalid ||
       car.pitStatus !== PitStatus.None ||
       car.driverStatus === DriverStatus.Garage ||
       car.driverStatus === DriverStatus.InLap ||
       car.driverStatus === DriverStatus.OutLap
     ) {
-      this.invalid = true;
+      this.discarded = true;
     }
+    if (car.currentLapInvalid) this.gameInvalid = true;
   }
 
   private onHistory(laps: readonly LapHistoryEntry[]): CompletedLap | undefined {
@@ -192,7 +199,6 @@ export class LapRecorder {
     if (!entry || entry.lapTimeMs <= 0) return undefined;
     const pending = this.pending;
     this.pending = null;
-    if (!entry.lapValid) return undefined;
     return {
       session: {
         game: this.game,
@@ -206,6 +212,7 @@ export class LapRecorder {
       sector1Ms: entry.sector1Ms,
       sector2Ms: entry.sector2Ms,
       sector3Ms: entry.sector3Ms,
+      valid: !pending.gameInvalid && entry.lapValid,
       condition: pending.condition,
       teamId: pending.teamId,
       tyreCompound: pending.tyreCompound,
@@ -216,4 +223,9 @@ export class LapRecorder {
       trace: pending.trace,
     };
   }
+}
+
+/** Invalid Laps are stored only when Config keeps them. */
+export function storesLap(valid: boolean, storeInvalidLaps: boolean): boolean {
+  return valid || storeInvalidLaps;
 }

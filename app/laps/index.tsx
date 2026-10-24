@@ -7,6 +7,7 @@ import { teamName } from "@/protocol/teams";
 import { trackLabel } from "@/protocol/tracks";
 import { lapRepository } from "@/capture/runtime";
 import type { LapSort, LapSummary } from "@/storage/lap-repository";
+import { CheckRow } from "@/ui/CheckRow";
 import { Chip } from "@/ui/Chip";
 import { LapsTable } from "@/ui/LapsTable";
 import { colors } from "@/ui/theme";
@@ -21,6 +22,7 @@ export default function LapsHistoryScreen() {
   const [trackOpen, setTrackOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [sort, setSort] = useState<LapSort>("newest");
+  const [hideInvalid, setHideInvalid] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const selectedTrackId = trackId ?? tracks[0];
@@ -49,11 +51,12 @@ export default function LapsHistoryScreen() {
     () =>
       laps.filter(
         (lap) =>
+          (!hideInvalid || lap.valid) &&
           (condition === undefined || lap.condition === condition) &&
           (gameMode === undefined || lap.gameMode === gameMode) &&
           (teamId === undefined || lap.teamId === teamId),
       ),
-    [laps, condition, gameMode, teamId],
+    [laps, hideInvalid, condition, gameMode, teamId],
   );
 
   const modes = [...new Set(laps.map((lap) => lap.gameMode))].sort((a, b) => a - b);
@@ -135,6 +138,11 @@ export default function LapsHistoryScreen() {
                 />
               ))}
             </View>
+            <CheckRow
+              label="Hide invalid Laps"
+              checked={hideInvalid}
+              onPress={() => setHideInvalid((value) => !value)}
+            />
             <Text style={styles.muted}>Team</Text>
             <View style={styles.chips}>
               <Chip label="All" selected={teamId === undefined} onPress={() => setTeamId(undefined)} />

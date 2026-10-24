@@ -31,6 +31,8 @@ export interface LapSummary {
   sector1Ms: number;
   sector2Ms: number;
   sector3Ms: number;
+  /** False when the Game marks this Lap Invalid. */
+  valid: boolean;
   condition: Condition;
   finishedAt: number;
   hasTrace: boolean;
@@ -75,6 +77,7 @@ export interface StoredLap {
   sector1Ms: number;
   sector2Ms: number;
   sector3Ms: number;
+  valid: boolean;
   teamId: number;
   tyreCompound: number;
   trackTempC: number;
@@ -99,6 +102,8 @@ export interface SessionQuery {
   trackId?: number;
   teamId?: number;
   sessionType?: number;
+  /** When true, Session summaries count Valid Laps only. */
+  validOnly?: boolean;
 }
 
 export interface SessionSummary {

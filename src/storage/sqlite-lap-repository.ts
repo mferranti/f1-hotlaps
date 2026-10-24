@@ -40,6 +40,7 @@ type LapRow = {
   sector1_ms: number;
   sector2_ms: number;
   sector3_ms: number;
+  valid: number;
   team_id: number;
   tyre_compound: number;
   track_temp_c: number;
@@ -64,9 +65,9 @@ export class SqliteLapRepository implements LapRepository {
       const result = await db.runAsync(
         `INSERT INTO laps (
           session_id, game, track_id, condition, lap_number, lap_time_ms,
-          sector1_ms, sector2_ms, sector3_ms, team_id, tyre_compound, track_temp_c, air_temp_c,
+          sector1_ms, sector2_ms, sector3_ms, valid, team_id, tyre_compound, track_temp_c, air_temp_c,
           setup_json, finished_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         sessionId,
         lap.session.game,
         lap.session.trackId,
@@ -76,6 +77,7 @@ export class SqliteLapRepository implements LapRepository {
         lap.sector1Ms,
         lap.sector2Ms,
         lap.sector3Ms,
+        lap.valid ? 1 : 0,
         lap.teamId,
         lap.tyreCompound,
         lap.trackTempC,
@@ -291,9 +293,9 @@ export class SqliteLapRepository implements LapRepository {
         await db.runAsync(
           `INSERT INTO laps (
             id, session_id, game, track_id, condition, lap_number, lap_time_ms,
-            sector1_ms, sector2_ms, sector3_ms, team_id, tyre_compound, track_temp_c, air_temp_c,
+            sector1_ms, sector2_ms, sector3_ms, valid, team_id, tyre_compound, track_temp_c, air_temp_c,
             setup_json, finished_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           lap.id,
           lap.sessionId,
           lap.game,
@@ -304,6 +306,7 @@ export class SqliteLapRepository implements LapRepository {
           lap.sector1Ms,
           lap.sector2Ms,
           lap.sector3Ms,
+          lap.valid ? 1 : 0,
           lap.teamId,
           lap.tyreCompound,
           lap.trackTempC,
@@ -405,6 +408,7 @@ function toStoredLap(row: LapRow): StoredLap {
     sector1Ms: row.sector1_ms,
     sector2Ms: row.sector2_ms,
     sector3Ms: row.sector3_ms,
+    valid: Number(row.valid) !== 0,
     teamId: row.team_id,
     tyreCompound: row.tyre_compound,
     trackTempC: row.track_temp_c,
@@ -419,6 +423,7 @@ function toGrouped(row: LapRow) {
     id: row.id,
     lapTimeMs: row.lap_time_ms,
     finishedAt: row.finished_at,
+    valid: Number(row.valid) !== 0,
     game: row.game,
     trackId: row.track_id,
     condition: row.condition,

@@ -16,7 +16,7 @@ This project is not affiliated with, endorsed by, or connected to Electronic Art
 
 While the game is sending telemetry, the home screen shows whether the phone is receiving, the packet rate, and the car you are driving: track, session, lap time, speed, throttle, and brake.
 
-A lap is stored when the app saw it start, it stayed valid, and the game confirms it in session history. Laps marked invalid, laps with a pit stop, flashbacks, and laps still in progress are not stored. Each stored lap keeps its time, sectors, tyre, car setup, track and air temperature, and a trace: speed, throttle, brake, gear, DRS, and ERS along the lap, one sample about every 10 metres.
+A lap is stored when the app saw it start and the game reports a lap time. Laps the game marks invalid are stored when Store invalid laps is on, which it is by default, and history hides them until that filter is turned off. Laps with a pit stop, flashbacks, and laps still in progress are not stored. Each stored lap keeps its time, sectors, tyre, car setup, track and air temperature, and a trace: speed, throttle, brake, gear, DRS, and ERS along the lap, one sample about every 10 metres.
 
 Open a lap to see its sectors against the others on that track, the car setup, and graphs for the trace. You can overlay the fastest lap on the same track and condition (dry or wet) and see the time delta along the distance.
 

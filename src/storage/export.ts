@@ -104,6 +104,7 @@ function parseLap(value: unknown): StoredLap {
     sector1Ms: wholeNumber(value.sector1Ms),
     sector2Ms: wholeNumber(value.sector2Ms),
     sector3Ms: wholeNumber(value.sector3Ms),
+    valid: parseValid(value.valid),
     teamId: wholeNumber(value.teamId),
     tyreCompound: wholeNumber(value.tyreCompound),
     trackTempC: finite(value.trackTempC),
@@ -137,6 +138,12 @@ function parseSetup(value: unknown): CarSetup {
   const setup: Record<string, number> = {};
   for (const [key, item] of Object.entries(value)) setup[key] = finite(item);
   return setup;
+}
+
+function parseValid(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (typeof value === "boolean") return value;
+  throw new Error(NOT_AN_EXPORT);
 }
 
 function parseGame(value: unknown): Game {

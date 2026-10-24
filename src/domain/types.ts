@@ -30,6 +30,8 @@ export interface CompletedLap {
   sector1Ms: number;
   sector2Ms: number;
   sector3Ms: number;
+  /** False when the Game marks this Lap Invalid. */
+  valid: boolean;
   condition: Condition;
   teamId: number;
   tyreCompound: number;

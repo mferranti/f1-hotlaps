@@ -49,6 +49,7 @@ export class MemoryLapRepository implements LapRepository {
       sector1Ms: lap.sector1Ms,
       sector2Ms: lap.sector2Ms,
       sector3Ms: lap.sector3Ms,
+      valid: lap.valid,
       teamId: lap.teamId,
       tyreCompound: lap.tyreCompound,
       trackTempC: lap.trackTempC,

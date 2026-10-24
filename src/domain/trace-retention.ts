@@ -2,12 +2,14 @@ export interface RetentionCandidate {
   id: number;
   lapTimeMs: number;
   finishedAt: number;
+  /** Absent means Valid. An Invalid Lap cannot be Fastest or Latest. */
+  valid?: boolean;
 }
 
 /**
  * Picks which Laps of one group (Game, track, Condition) keep a Trace.
- * Fastest: lowest lap time, the earlier Lap wins a tie.
- * Latest: most recently finished Lap that is not the Fastest.
+ * Fastest: lowest lap time among Valid Laps, the earlier Lap wins a tie.
+ * Latest: most recently finished Valid Lap that is not the Fastest.
  */
 export function tracedLaps(group: readonly RetentionCandidate[]): {
   fastestId: number | null;
@@ -15,6 +17,7 @@ export function tracedLaps(group: readonly RetentionCandidate[]): {
 } {
   let fastest: RetentionCandidate | undefined;
   for (const lap of group) {
+    if (lap.valid === false) continue;
     if (
       !fastest ||
       lap.lapTimeMs < fastest.lapTimeMs ||
@@ -26,9 +29,8 @@ export function tracedLaps(group: readonly RetentionCandidate[]): {
 
   let latest: RetentionCandidate | undefined;
   for (const lap of group) {
-    if (lap !== fastest && (!latest || lap.finishedAt > latest.finishedAt)) {
-      latest = lap;
-    }
+    if (lap.valid === false || lap === fastest) continue;
+    if (!latest || lap.finishedAt > latest.finishedAt) latest = lap;
   }
 
   return { fastestId: fastest?.id ?? null, latestId: latest?.id ?? null };
