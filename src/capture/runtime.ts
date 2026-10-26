@@ -149,6 +149,9 @@ async function listen(port: number): Promise<void> {
               sessionUid: packet.header.sessionUid,
               position: car.position,
               resultStatus: car.resultStatus,
+              gridPosition: car.gridPosition,
+              pitStops: car.numPitStops,
+              totalRaceTimeMs: Math.round(car.totalRaceTimeS * 1000),
             })
             .then(() => notifyLaps());
         }

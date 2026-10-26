@@ -33,7 +33,9 @@ export function LapsTable({
       {laps.length === 0 ? <Text style={styles.muted}>No Laps yet</Text> : null}
       {laps.map((lap) => (
         <Link key={lap.id} href={`/laps/${lap.id}`} asChild>
-          <Pressable style={[styles.dataRow, lap.valid ? null : styles.invalidRow]}>
+          <Pressable
+            style={StyleSheet.flatten([styles.dataRow, lap.valid ? null : styles.invalidRow])}
+          >
             {showLapNumber ? (
               <Text style={[styles.cell, styles.colLap]}>{lap.lapNumber}</Text>
             ) : null}

@@ -27,10 +27,12 @@ import {
   toSessionSummary,
   traceRoles,
 } from "./lap-rules";
+import { newUuid } from "./id";
 import { decodeTrace, encodeTrace } from "./trace-codec";
 
 type LapRow = {
   id: number;
+  uuid: string;
   session_id: number;
   game: Game;
   track_id: number;
@@ -41,8 +43,11 @@ type LapRow = {
   sector2_ms: number;
   sector3_ms: number;
   valid: number;
+  invalid_reason: string;
   team_id: number;
   tyre_compound: number;
+  visual_tyre_compound: number;
+  tyre_age_laps: number;
   track_temp_c: number;
   air_temp_c: number;
   setup_json: string;
@@ -53,7 +58,7 @@ type LapRow = {
 
 /** SQLite LapRepository. Screens talk to this through the interface, never the database. */
 export class SqliteLapRepository implements LapRepository {
-  private pendingResults = new Map<string, Pick<SessionResult, "position" | "resultStatus">>();
+  private pendingResults = new Map<string, SessionResult>();
 
   constructor(private readonly open: () => Promise<SQLiteDatabase> = getDatabase) {}
 
@@ -64,11 +69,12 @@ export class SqliteLapRepository implements LapRepository {
       const sessionId = await this.findOrCreateSession(db, lap);
       const result = await db.runAsync(
         `INSERT INTO laps (
-          session_id, game, track_id, condition, lap_number, lap_time_ms,
-          sector1_ms, sector2_ms, sector3_ms, valid, team_id, tyre_compound, track_temp_c, air_temp_c,
+          session_id, uuid, game, track_id, condition, lap_number, lap_time_ms,
+          sector1_ms, sector2_ms, sector3_ms, valid, invalid_reason, team_id, tyre_compound, visual_tyre_compound, tyre_age_laps, track_temp_c, air_temp_c,
           setup_json, finished_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         sessionId,
+        newUuid(),
         lap.session.game,
         lap.session.trackId,
         lap.condition,
@@ -78,8 +84,11 @@ export class SqliteLapRepository implements LapRepository {
         lap.sector2Ms,
         lap.sector3Ms,
         lap.valid ? 1 : 0,
+        lap.invalidReason ?? "",
         lap.teamId,
         lap.tyreCompound,
+        lap.visualTyreCompound,
+        lap.tyreAgeLaps,
         lap.trackTempC,
         lap.airTempC,
         JSON.stringify(lap.setup),
@@ -148,16 +157,17 @@ export class SqliteLapRepository implements LapRepository {
       result.sessionUid,
     );
     if (!existing) {
-      this.pendingResults.set(`${result.game}|${result.sessionUid}`, {
-        position: result.position,
-        resultStatus: result.resultStatus,
-      });
+      this.pendingResults.set(`${result.game}|${result.sessionUid}`, result);
       return;
     }
     await db.runAsync(
-      "UPDATE sessions SET result_status = ?, position = ? WHERE id = ?",
+      `UPDATE sessions SET result_status = ?, position = ?, grid_position = ?, pit_stops = ?, total_race_time_ms = ?
+       WHERE id = ?`,
       result.resultStatus,
       result.position,
+      result.gridPosition,
+      result.pitStops,
+      result.totalRaceTimeMs,
       existing.id,
     );
   }
@@ -181,6 +191,10 @@ export class SqliteLapRepository implements LapRepository {
       sessionUid: session.sessionUid,
       trackTempC: last?.trackTempC ?? 0,
       airTempC: last?.airTempC ?? 0,
+      aiDifficulty: session.aiDifficulty,
+      gridPosition: session.gridPosition,
+      pitStops: session.pitStops,
+      totalRaceTimeMs: session.totalRaceTimeMs,
       laps: laps.map((lap) => toLapSummary(lap, session, traced.has(lap.id), roles.get(lap.id) ?? null)),
     };
   }
@@ -276,9 +290,11 @@ export class SqliteLapRepository implements LapRepository {
       for (const session of data.sessions) {
         await db.runAsync(
           `INSERT INTO sessions (
-            id, game, session_uid, track_id, session_type, game_mode, started_at, result_status, position
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            id, uuid, game, session_uid, track_id, session_type, game_mode, started_at, result_status, position,
+            ai_difficulty, grid_position, pit_stops, total_race_time_ms
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           session.id,
+          session.uuid,
           session.game,
           session.sessionUid,
           session.trackId,
@@ -287,16 +303,21 @@ export class SqliteLapRepository implements LapRepository {
           session.startedAt,
           session.resultStatus,
           session.position,
+          session.aiDifficulty,
+          session.gridPosition,
+          session.pitStops,
+          session.totalRaceTimeMs,
         );
       }
       for (const lap of data.laps) {
         await db.runAsync(
           `INSERT INTO laps (
-            id, session_id, game, track_id, condition, lap_number, lap_time_ms,
-            sector1_ms, sector2_ms, sector3_ms, valid, team_id, tyre_compound, track_temp_c, air_temp_c,
+            id, uuid, session_id, game, track_id, condition, lap_number, lap_time_ms,
+            sector1_ms, sector2_ms, sector3_ms, valid, invalid_reason, team_id, tyre_compound, visual_tyre_compound, tyre_age_laps, track_temp_c, air_temp_c,
             setup_json, finished_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           lap.id,
+          lap.uuid,
           lap.sessionId,
           lap.game,
           lap.trackId,
@@ -307,8 +328,11 @@ export class SqliteLapRepository implements LapRepository {
           lap.sector2Ms,
           lap.sector3Ms,
           lap.valid ? 1 : 0,
+          lap.invalidReason ?? "",
           lap.teamId,
           lap.tyreCompound,
+          lap.visualTyreCompound,
+          lap.tyreAgeLaps,
           lap.trackTempC,
           lap.airTempC,
           JSON.stringify(lap.setup),
@@ -332,6 +356,7 @@ export class SqliteLapRepository implements LapRepository {
     return {
       sessions: sessions.map((row) => ({
         id: row.id,
+        uuid: row.uuid,
         game: row.game,
         sessionUid: row.session_uid,
         trackId: row.track_id,
@@ -340,6 +365,10 @@ export class SqliteLapRepository implements LapRepository {
         startedAt: row.started_at,
         resultStatus: row.result_status,
         position: row.position,
+        aiDifficulty: row.ai_difficulty,
+        gridPosition: row.grid_position,
+        pitStops: row.pit_stops,
+        totalRaceTimeMs: row.total_race_time_ms,
       })),
       laps: laps.map(toStoredLap),
       traces: traces.map((row) => ({ lapId: row.lap_id, samples: decodeTrace(row.samples) })),
@@ -352,11 +381,24 @@ export class SqliteLapRepository implements LapRepository {
       lap.session.game,
       lap.session.sessionUid,
     );
-    if (existing) return existing.id;
+    if (existing) {
+      await db.runAsync(
+        "UPDATE sessions SET ai_difficulty = ?, grid_position = ?, pit_stops = ? WHERE id = ?",
+        lap.session.aiDifficulty,
+        lap.session.gridPosition,
+        lap.session.pitStops,
+        existing.id,
+      );
+      return existing.id;
+    }
     const pending = this.pendingResults.get(`${lap.session.game}|${lap.session.sessionUid}`);
     this.pendingResults.delete(`${lap.session.game}|${lap.session.sessionUid}`);
     const result = await db.runAsync(
-      "INSERT INTO sessions (game, session_uid, track_id, session_type, game_mode, started_at, result_status, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      `INSERT INTO sessions (
+        uuid, game, session_uid, track_id, session_type, game_mode, started_at, result_status, position,
+        ai_difficulty, grid_position, pit_stops, total_race_time_ms
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      newUuid(),
       lap.session.game,
       lap.session.sessionUid,
       lap.session.trackId,
@@ -365,6 +407,10 @@ export class SqliteLapRepository implements LapRepository {
       sessionStartedAt(lap),
       pending?.resultStatus ?? 0,
       pending?.position ?? 0,
+      lap.session.aiDifficulty,
+      pending?.gridPosition ?? lap.session.gridPosition,
+      pending?.pitStops ?? lap.session.pitStops,
+      pending?.totalRaceTimeMs ?? 0,
     );
     return Number(result.lastInsertRowId);
   }
@@ -372,6 +418,7 @@ export class SqliteLapRepository implements LapRepository {
 
 type StoredSessionRow = {
   id: number;
+  uuid: string;
   game: Game;
   session_uid: string;
   track_id: number;
@@ -380,11 +427,16 @@ type StoredSessionRow = {
   started_at: number;
   result_status: number;
   position: number;
+  ai_difficulty: number;
+  grid_position: number;
+  pit_stops: number;
+  total_race_time_ms: number;
 };
 
 function toStoredSession(row: StoredSessionRow) {
   return {
     id: row.id,
+    uuid: row.uuid,
     game: row.game,
     sessionUid: row.session_uid,
     trackId: row.track_id,
@@ -393,12 +445,17 @@ function toStoredSession(row: StoredSessionRow) {
     startedAt: row.started_at,
     resultStatus: row.result_status,
     position: row.position,
+    aiDifficulty: row.ai_difficulty,
+    gridPosition: row.grid_position,
+    pitStops: row.pit_stops,
+    totalRaceTimeMs: row.total_race_time_ms,
   };
 }
 
 function toStoredLap(row: LapRow): StoredLap {
   return {
     id: row.id,
+    uuid: row.uuid,
     sessionId: row.session_id,
     game: row.game,
     trackId: row.track_id,
@@ -409,8 +466,11 @@ function toStoredLap(row: LapRow): StoredLap {
     sector2Ms: row.sector2_ms,
     sector3Ms: row.sector3_ms,
     valid: Number(row.valid) !== 0,
+    invalidReason: row.invalid_reason === "flashback" ? "flashback" : null,
     teamId: row.team_id,
     tyreCompound: row.tyre_compound,
+    visualTyreCompound: row.visual_tyre_compound,
+    tyreAgeLaps: row.tyre_age_laps,
     trackTempC: row.track_temp_c,
     airTempC: row.air_temp_c,
     setup: JSON.parse(row.setup_json) as Record<string, number>,

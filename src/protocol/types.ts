@@ -7,6 +7,8 @@ export interface SessionData {
   sessionType: number;
   trackId: number;
   gameMode: number;
+  /** 0–110. -1 when the Packet was too short to include it. */
+  aiDifficulty: number;
 }
 
 export interface LapData {
@@ -17,7 +19,10 @@ export interface LapData {
   lapDistanceM: number;
   currentLapNum: number;
   pitStatus: number;
+  numPitStops: number;
   currentLapInvalid: boolean;
+  /** 0 when the car has no grid, such as practice. */
+  gridPosition: number;
   driverStatus: number;
 }
 
@@ -63,6 +68,10 @@ export interface CarTelemetryData {
 
 export interface CarStatusData {
   actualTyreCompound: number;
+  /** Visual type: soft, medium, hard, intermediate, or wet. */
+  visualTyreCompound: number;
+  /** Laps on the current set. */
+  tyresAgeLaps: number;
   ersStoreEnergy: number;
 }
 
@@ -89,6 +98,10 @@ export interface SessionHistoryData {
 export interface FinalClassificationData {
   position: number;
   resultStatus: number;
+  gridPosition: number;
+  numPitStops: number;
+  /** Total race time in seconds, without penalties. 0 when the Game did not report one. */
+  totalRaceTimeS: number;
 }
 
 export type DecodedBody =

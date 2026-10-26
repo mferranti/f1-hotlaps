@@ -1,18 +1,23 @@
-import type { CompletedLap } from "@/domain/types";
+import type { CompletedLap, SessionInfo } from "@/domain/types";
+import type { SessionResult } from "./lap-repository";
 
+import { isUuid } from "./id";
 import { MemoryLapRepository } from "./memory-lap-repository";
 
 function lap(overrides: Partial<CompletedLap> & Pick<CompletedLap, "lapTimeMs" | "finishedAt">): CompletedLap {
   return {
-    session: { game: "f1-26", sessionUid: "1", trackId: 11, sessionType: 18, gameMode: 5 },
+    session: info(),
     lapNumber: 1,
     sector1Ms: 25_000,
     sector2Ms: 27_000,
     sector3Ms: 29_000,
     valid: true,
+    invalidReason: null,
     condition: "dry",
     teamId: 8,
     tyreCompound: 16,
+    visualTyreCompound: 0,
+    tyreAgeLaps: 0,
     trackTempC: 40,
     airTempC: 28,
     setup: { frontWing: 8 },
@@ -22,6 +27,18 @@ function lap(overrides: Partial<CompletedLap> & Pick<CompletedLap, "lapTimeMs" |
 }
 
 describe("MemoryLapRepository", () => {
+  it("assigns a uuid when a Session and Lap are stored", async () => {
+    const repo = new MemoryLapRepository();
+    await repo.commitLap(lap({ lapTimeMs: 90_000, finishedAt: 1 }));
+    await repo.commitLap(lap({ lapTimeMs: 91_000, finishedAt: 2, lapNumber: 2 }));
+
+    const data = await repo.readAll();
+    expect(data.sessions).toHaveLength(1);
+    expect(isUuid(data.sessions[0]?.uuid)).toBe(true);
+    expect(data.laps.map((row) => isUuid(row.uuid))).toEqual([true, true]);
+    expect(data.laps[0]?.uuid).not.toBe(data.laps[1]?.uuid);
+  });
+
   it("keeps Traces only on Fastest and Latest through the A B C D walkthrough", async () => {
     const repo = new MemoryLapRepository();
     const a = await repo.commitLap(lap({ lapTimeMs: 82_000, finishedAt: 1_000, trace: [sample("a")] }));
@@ -57,14 +74,14 @@ describe("MemoryLapRepository", () => {
         finishedAt: 2_000,
         lapNumber: 2,
         teamId: 104,
-        session: { game: "f1-26", sessionUid: "1", trackId: 11, sessionType: 18, gameMode: 5 },
+        session: info(),
       }),
     );
     await repo.commitLap(
       lap({
         lapTimeMs: 90_000,
         finishedAt: 3_000,
-        session: { game: "f1-26", sessionUid: "race", trackId: 10, sessionType: 15, gameMode: 1 },
+        session: info({ sessionUid: "race", trackId: 10, sessionType: 15, gameMode: 1 }),
         teamId: 0,
       }),
     );
@@ -89,17 +106,27 @@ describe("MemoryLapRepository", () => {
 
   it("stores a Race Result on the Session, including if the Packet arrives before the first Lap", async () => {
     const repo = new MemoryLapRepository();
-    await repo.saveSessionResult({ game: "f1-26", sessionUid: "1", position: 1, resultStatus: 3 });
-    await repo.commitLap(
+    await repo.saveSessionResult(result({ sessionUid: "1", position: 1, resultStatus: 3, gridPosition: 4, pitStops: 2, totalRaceTimeMs: 90_500 }));
+    const id = await repo.commitLap(
       lap({
         lapTimeMs: 90_000,
         finishedAt: 1_000,
-        session: { game: "f1-26", sessionUid: "1", trackId: 11, sessionType: 15, gameMode: 1 },
+        tyreAgeLaps: 7,
+        session: info({ sessionType: 15, gameMode: 1, aiDifficulty: 80, gridPosition: 6, pitStops: 1 }),
       }),
     );
-    await repo.saveSessionResult({ game: "f1-26", sessionUid: "1", position: 20, resultStatus: 4 });
+    const before = await repo.getSession((await repo.listSessions())[0]!.id);
+    expect(before).toMatchObject({
+      aiDifficulty: 80,
+      gridPosition: 4,
+      pitStops: 2,
+      totalRaceTimeMs: 90_500,
+    });
+    expect(await repo.getLap(id)).toMatchObject({ tyreCompound: 16, tyreAgeLaps: 7 });
+    await repo.saveSessionResult(result({ sessionUid: "1", position: 20, resultStatus: 4, gridPosition: 4, pitStops: 3, totalRaceTimeMs: 91_000 }));
     const [row] = await repo.listSessions();
     expect(row).toMatchObject({ position: 20, resultStatus: 4 });
+    expect(await repo.getSession(row!.id)).toMatchObject({ gridPosition: 4, pitStops: 3, totalRaceTimeMs: 91_000 });
   });
 
   it("filters by track and Condition and sorts", async () => {
@@ -128,12 +155,13 @@ describe("MemoryLapRepository", () => {
 
   it("replaces every Session, Lap, and Trace and keeps the stored ids", async () => {
     const repo = new MemoryLapRepository();
-    await repo.saveSessionResult({ game: "f1-26", sessionUid: "later", position: 1, resultStatus: 3 });
+    await repo.saveSessionResult(result({ sessionUid: "later", position: 1, resultStatus: 3 }));
     await repo.commitLap(lap({ lapTimeMs: 90_000, finishedAt: 1 }));
     const incoming = {
       sessions: [
         {
           id: 4,
+          uuid: "11111111-1111-4111-8111-111111111111",
           game: "f1-25" as const,
           sessionUid: "restored",
           trackId: 16,
@@ -142,11 +170,16 @@ describe("MemoryLapRepository", () => {
           startedAt: 50,
           resultStatus: 2,
           position: 6,
+          aiDifficulty: 90,
+          gridPosition: 3,
+          pitStops: 1,
+          totalRaceTimeMs: 5_400_000,
         },
       ],
       laps: [
         {
           id: 7,
+          uuid: "22222222-2222-4222-8222-222222222222",
           sessionId: 4,
           game: "f1-25" as const,
           trackId: 16,
@@ -157,8 +190,11 @@ describe("MemoryLapRepository", () => {
           sector2Ms: 32_000,
           sector3Ms: 33_000,
           valid: true,
+          invalidReason: null,
           teamId: 1,
           tyreCompound: 17,
+          visualTyreCompound: 16,
+          tyreAgeLaps: 11,
           trackTempC: 18,
           airTempC: 16,
           setup: { rearWing: 4 },
@@ -182,7 +218,7 @@ describe("MemoryLapRepository", () => {
       lap({
         lapTimeMs: 96_000,
         finishedAt: 90,
-        session: { game: "f1-26", sessionUid: "later", trackId: 11, sessionType: 18, gameMode: 5 },
+        session: info({ sessionUid: "later" }),
       }),
     );
     expect(next).toBe(8);
@@ -199,7 +235,7 @@ describe("MemoryLapRepository", () => {
         lapTimeMs: 100_000,
         finishedAt: 3,
         valid: false,
-        session: { game: "f1-26", sessionUid: "only-invalid", trackId: 10, sessionType: 18, gameMode: 5 },
+        session: info({ sessionUid: "only-invalid", trackId: 10 }),
       }),
     );
 
@@ -242,8 +278,28 @@ function sample(label: string) {
   return { distanceM: 0, throttle: 1, brake: 0, speedKph: label.length, elapsedMs: 0, gear: 4, drs: 0, ers: 0 };
 }
 
-function session(trackId: number) {
-  return { game: "f1-26" as const, sessionUid: String(trackId), trackId, sessionType: 18, gameMode: 5 };
+function session(trackId: number): SessionInfo {
+  return info({ sessionUid: String(trackId), trackId });
+}
+
+function info(overrides: Partial<SessionInfo> = {}): SessionInfo {
+  return {
+    game: "f1-26",
+    sessionUid: "1",
+    trackId: 11,
+    sessionType: 18,
+    gameMode: 5,
+    aiDifficulty: -1,
+    gridPosition: 0,
+    pitStops: 0,
+    ...overrides,
+  };
+}
+
+function result(
+  overrides: Partial<SessionResult> & Pick<SessionResult, "sessionUid" | "position" | "resultStatus">,
+): SessionResult {
+  return { game: "f1-26", gridPosition: 0, pitStops: 0, totalRaceTimeMs: 0, ...overrides };
 }
 
 async function traces(repo: MemoryLapRepository) {

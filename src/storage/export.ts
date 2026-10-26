@@ -1,8 +1,9 @@
 import { Paths, File } from "expo-file-system";
 import { shareAsync } from "expo-sharing";
 
-import type { CarSetup, Game, TraceSample } from "@/domain/types";
+import type { CarSetup, Game, InvalidReason, TraceSample } from "@/domain/types";
 
+import { isUuid, newUuid } from "./id";
 import type { LapRepository, StoredData, StoredLap, StoredSession, StoredTrace } from "./lap-repository";
 
 export const EXPORT_FORMAT_VERSION = 1;
@@ -46,6 +47,8 @@ export function parseExport(text: string): StoredData {
   const traces = value.traces.map(parseTrace);
   const sessionIds = ids(sessions);
   const lapIds = ids(laps);
+  uniqueUuids(sessions);
+  uniqueUuids(laps);
   const sessionKeys = new Set(sessions.map((session) => JSON.stringify([session.game, session.sessionUid])));
   if (sessionKeys.size !== sessions.length) throw new Error(NOT_AN_EXPORT);
   const traceIds = new Set<number>();
@@ -86,7 +89,22 @@ function parseSession(value: unknown): StoredSession {
   const resultStatus = wholeNumber(value.resultStatus);
   const position = wholeNumber(value.position);
   if (typeof sessionUid !== "string") throw new Error(NOT_AN_EXPORT);
-  return { id, game, sessionUid, trackId, sessionType, gameMode, startedAt, resultStatus, position };
+  return {
+    id,
+    uuid: parseUuid(value.uuid),
+    game,
+    sessionUid,
+    trackId,
+    sessionType,
+    gameMode,
+    startedAt,
+    resultStatus,
+    position,
+    aiDifficulty: optionalDifficulty(value.aiDifficulty),
+    gridPosition: optionalWhole(value.gridPosition),
+    pitStops: optionalWhole(value.pitStops),
+    totalRaceTimeMs: optionalWhole(value.totalRaceTimeMs),
+  };
 }
 
 function parseLap(value: unknown): StoredLap {
@@ -95,6 +113,7 @@ function parseLap(value: unknown): StoredLap {
   if (condition !== "dry" && condition !== "wet") throw new Error(NOT_AN_EXPORT);
   return {
     id: positiveId(value.id),
+    uuid: parseUuid(value.uuid),
     sessionId: positiveId(value.sessionId),
     game: parseGame(value.game),
     trackId: wholeNumber(value.trackId),
@@ -105,8 +124,11 @@ function parseLap(value: unknown): StoredLap {
     sector2Ms: wholeNumber(value.sector2Ms),
     sector3Ms: wholeNumber(value.sector3Ms),
     valid: parseValid(value.valid),
+    invalidReason: parseInvalidReason(value.invalidReason),
     teamId: wholeNumber(value.teamId),
     tyreCompound: wholeNumber(value.tyreCompound),
+    visualTyreCompound: optionalWhole(value.visualTyreCompound),
+    tyreAgeLaps: optionalWhole(value.tyreAgeLaps),
     trackTempC: finite(value.trackTempC),
     airTempC: finite(value.airTempC),
     setup: parseSetup(value.setup),
@@ -140,6 +162,12 @@ function parseSetup(value: unknown): CarSetup {
   return setup;
 }
 
+function parseInvalidReason(value: unknown): InvalidReason | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (value === "flashback") return value;
+  throw new Error(NOT_AN_EXPORT);
+}
+
 function parseValid(value: unknown): boolean {
   if (value === undefined) return true;
   if (typeof value === "boolean") return value;
@@ -149,6 +177,18 @@ function parseValid(value: unknown): boolean {
 function parseGame(value: unknown): Game {
   if (value === "f1-25" || value === "f1-26") return value;
   throw new Error(NOT_AN_EXPORT);
+}
+
+/** Keeps a uuid from the file. An older export has none, so one is created. */
+function parseUuid(value: unknown): string {
+  if (value === undefined || value === null || value === "") return newUuid();
+  if (isUuid(value)) return value;
+  throw new Error(NOT_AN_EXPORT);
+}
+
+function uniqueUuids(rows: readonly { uuid: string }[]): void {
+  const seen = new Set(rows.map((row) => row.uuid));
+  if (seen.size !== rows.length) throw new Error(NOT_AN_EXPORT);
 }
 
 function ids(rows: readonly { id: number }[]): Set<number> {
@@ -164,6 +204,17 @@ function positiveId(value: unknown): number {
 
 function wholeNumber(value: unknown): number {
   if (typeof value === "number" && Number.isInteger(value) && value >= 0) return value;
+  throw new Error(NOT_AN_EXPORT);
+}
+
+function optionalWhole(value: unknown): number {
+  if (value === undefined) return 0;
+  return wholeNumber(value);
+}
+
+function optionalDifficulty(value: unknown): number {
+  if (value === undefined) return -1;
+  if (typeof value === "number" && Number.isInteger(value) && value >= -1) return value;
   throw new Error(NOT_AN_EXPORT);
 }
 

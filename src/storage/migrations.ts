@@ -45,6 +45,27 @@ export const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE laps ADD COLUMN valid INTEGER NOT NULL DEFAULT 1;
   `,
+  `
+  ALTER TABLE sessions ADD COLUMN ai_difficulty INTEGER NOT NULL DEFAULT -1;
+  ALTER TABLE sessions ADD COLUMN grid_position INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE sessions ADD COLUMN pit_stops INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE sessions ADD COLUMN total_race_time_ms INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE laps ADD COLUMN tyre_age_laps INTEGER NOT NULL DEFAULT 0;
+  `,
+  `
+  ALTER TABLE laps ADD COLUMN visual_tyre_compound INTEGER NOT NULL DEFAULT 0;
+  `,
+  `
+  ALTER TABLE laps ADD COLUMN invalid_reason TEXT NOT NULL DEFAULT '';
+  `,
+  `
+  ALTER TABLE sessions ADD COLUMN uuid TEXT NOT NULL DEFAULT '';
+  ALTER TABLE laps ADD COLUMN uuid TEXT NOT NULL DEFAULT '';
+  UPDATE sessions SET uuid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))) WHERE uuid = '';
+  UPDATE laps SET uuid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))) WHERE uuid = '';
+  CREATE UNIQUE INDEX sessions_uuid ON sessions (uuid);
+  CREATE UNIQUE INDEX laps_uuid ON laps (uuid);
+  `,
 ];
 
 export interface MigratableDatabase {

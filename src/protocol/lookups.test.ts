@@ -1,7 +1,30 @@
 import { gameModeName } from "./game-modes";
+import { tyreCompoundName, tyreKind } from "./tyres";
 import { isRaceSession, sessionTypeName } from "./session-types";
 import { MY_TEAM_ID, recordedTeamId, teamName } from "./teams";
 import { trackFlag, trackLabel, trackName } from "./tracks";
+
+describe("tyreCompoundName", () => {
+  it("names an F1 compound and keeps an unknown id", () => {
+    expect(tyreCompoundName(16)).toBe("C5");
+    expect(tyreCompoundName(7)).toBe("Intermediate");
+    expect(tyreCompoundName(3)).toBe("Compound 3");
+  });
+
+  it("uses the visual type, then the compound", () => {
+    expect(tyreKind(16, 20)).toBe("soft");
+    expect(tyreKind(17, 16)).toBe("medium");
+    expect(tyreKind(18, 16)).toBe("hard");
+    expect(tyreKind(7, 16)).toBe("intermediate");
+    expect(tyreKind(8, 16)).toBe("wet");
+    expect(tyreKind(0, 16)).toBe("soft");
+    expect(tyreKind(0, 13)).toBe("medium");
+    expect(tyreKind(0, 14)).toBe("hard");
+    expect(tyreKind(0, 7)).toBe("intermediate");
+    expect(tyreKind(0, 8)).toBe("wet");
+    expect(tyreKind(0, 3)).toBeNull();
+  });
+});
 
 describe("trackName", () => {
   it("names known tracks from the Season 8 appendix", () => {

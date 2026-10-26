@@ -3,6 +3,7 @@ import type {
   CompletedLap,
   Condition,
   Game,
+  InvalidReason,
   TraceRetention,
   TraceRole,
   TraceSample,
@@ -31,7 +32,7 @@ export interface LapSummary {
   sector1Ms: number;
   sector2Ms: number;
   sector3Ms: number;
-  /** False when the Game marks this Lap Invalid. */
+  /** False when the Lap does not count. */
   valid: boolean;
   condition: Condition;
   finishedAt: number;
@@ -40,7 +41,10 @@ export interface LapSummary {
 }
 
 export interface LapDetail extends LapSummary {
+  invalidReason: InvalidReason | null;
   tyreCompound: number;
+  visualTyreCompound: number;
+  tyreAgeLaps: number;
   trackTempC: number;
   airTempC: number;
   setup: CarSetup;
@@ -49,6 +53,7 @@ export interface LapDetail extends LapSummary {
 
 export interface StoredSession {
   id: number;
+  uuid: string;
   game: Game;
   sessionUid: string;
   trackId: number;
@@ -57,6 +62,12 @@ export interface StoredSession {
   startedAt: number;
   resultStatus: number;
   position: number;
+  /** -1 until a Session Packet is seen. */
+  aiDifficulty: number;
+  gridPosition: number;
+  pitStops: number;
+  /** 0 until Final Classification reports a race time. */
+  totalRaceTimeMs: number;
 }
 
 export interface SessionResult {
@@ -64,10 +75,14 @@ export interface SessionResult {
   sessionUid: string;
   position: number;
   resultStatus: number;
+  gridPosition: number;
+  pitStops: number;
+  totalRaceTimeMs: number;
 }
 
 export interface StoredLap {
   id: number;
+  uuid: string;
   sessionId: number;
   game: Game;
   trackId: number;
@@ -78,8 +93,11 @@ export interface StoredLap {
   sector2Ms: number;
   sector3Ms: number;
   valid: boolean;
+  invalidReason: InvalidReason | null;
   teamId: number;
   tyreCompound: number;
+  visualTyreCompound: number;
+  tyreAgeLaps: number;
   trackTempC: number;
   airTempC: number;
   setup: CarSetup;
@@ -125,6 +143,10 @@ export interface SessionDetail extends SessionSummary {
   sessionUid: string;
   trackTempC: number;
   airTempC: number;
+  aiDifficulty: number;
+  gridPosition: number;
+  pitStops: number;
+  totalRaceTimeMs: number;
   laps: LapSummary[];
 }
 

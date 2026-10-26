@@ -53,13 +53,13 @@ export default function SessionDetailScreen() {
         <Fact label="Ended" value={formatWhen(session.finishedAt)} />
         <Fact label="Laps" value={String(shown.length)} />
         <Fact label="Fastest" value={session.fastestLapTimeMs === 0 ? "-" : formatLapTime(session.fastestLapTimeMs)} />
-        {result ? <Fact label="Result" value={result} /> : null}
-        {session.lapCount > 0 ? (
-          <>
-            <Fact label="Track temp" value={formatTemperature(session.trackTempC, "c")} />
-            <Fact label="Air temp" value={formatTemperature(session.airTempC, "c")} />
-          </>
-        ) : null}
+        <Fact label="Result" value={result} />
+        <Fact label="Grid" value={session.gridPosition > 0 ? `P${session.gridPosition}` : "-"} />
+        <Fact label="Pit stops" value={session.pitStops < 0 ? "-" : String(session.pitStops)} />
+        <Fact label="Race time" value={session.totalRaceTimeMs > 0 ? formatLapTime(session.totalRaceTimeMs) : "-"} />
+        <Fact label="AI difficulty" value={session.aiDifficulty < 0 ? "-" : String(session.aiDifficulty)} />
+        <Fact label="Track temp" value={session.lapCount > 0 ? formatTemperature(session.trackTempC, "c") : "-"} />
+        <Fact label="Air temp" value={session.lapCount > 0 ? formatTemperature(session.airTempC, "c") : "-"} />
       </View>
       <Text style={styles.section}>Laps</Text>
       <CheckRow
@@ -73,10 +73,11 @@ export default function SessionDetailScreen() {
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
+  const text = value.trim();
   return (
     <View style={styles.fact}>
       <Text style={styles.factLabel}>{label}</Text>
-      <Text style={styles.factValue}>{value}</Text>
+      <Text style={styles.factValue}>{text === "" ? "-" : text}</Text>
     </View>
   );
 }

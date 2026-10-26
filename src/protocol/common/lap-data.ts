@@ -31,9 +31,11 @@ function readLapData(r: ByteReader): LapData {
   r.skip(1); // car position
   const currentLapNum = r.uint8();
   const pitStatus = r.uint8();
-  r.skip(2); // pit stops, sector
+  const numPitStops = r.uint8();
+  r.skip(1); // sector
   const currentLapInvalid = r.uint8() === 1;
-  r.skip(6); // penalties through grid position
+  r.skip(5); // penalties through unserved stop-go
+  const gridPosition = r.uint8();
   const driverStatus = r.uint8();
   r.skip(12); // result status through speed trap
   return {
@@ -44,7 +46,9 @@ function readLapData(r: ByteReader): LapData {
     lapDistanceM,
     currentLapNum,
     pitStatus,
+    numPitStops,
     currentLapInvalid,
+    gridPosition,
     driverStatus,
   };
 }

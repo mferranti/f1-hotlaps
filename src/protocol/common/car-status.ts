@@ -27,8 +27,10 @@ export function decodeCarStatus(bytes: Uint8Array, layout: GameLayout, playerCar
 function readStatus(r: ByteReader, layout: GameLayout): CarStatusData {
   r.skip(25); // through drsActivationDistance
   const actualTyreCompound = r.uint8();
-  r.skip(12); // visual compound through MGU-K power
+  const visualTyreCompound = r.uint8();
+  const tyresAgeLaps = r.uint8();
+  r.skip(9); // flags, ICE power, MGU-K power
   const ersStoreEnergy = r.float();
-  r.skip(layout.ersHarvestLimitPerLap ? 17 : 13);
-  return { actualTyreCompound, ersStoreEnergy };
+  r.skip(layout.ersHarvestLimitPerLap ? 18 : 14);
+  return { actualTyreCompound, visualTyreCompound, tyresAgeLaps, ersStoreEnergy };
 }

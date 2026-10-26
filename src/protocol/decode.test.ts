@@ -120,9 +120,11 @@ describe("decoded bodies", () => {
       .uint8(1)
       .uint8(4)
       .uint8(2)
-      .skip(2)
+      .uint8(3)
       .uint8(1)
-      .skip(6)
+      .uint8(1)
+      .skip(5)
+      .uint8(7)
       .uint8(4);
 
     const setup = packetWithHeader(carSetupsPacketSize(layout), {
@@ -147,7 +149,7 @@ describe("decoded bodies", () => {
       playerCarIndex: player,
     });
     status.seek(HEADER_SIZE + player * (format === 2025 ? 55 : 59) + 25);
-    status.uint8(16);
+    status.uint8(16).uint8(17).uint8(6).int8(0).float(0).float(0).float(1_500_000);
 
     const history = packetWithHeader(SESSION_HISTORY_PACKET_BYTES, {
       packetFormat: format,
@@ -172,6 +174,7 @@ describe("decoded bodies", () => {
       sessionType: 15,
       trackId: 11,
       gameMode: 0,
+      aiDifficulty: -1,
     });
 
     const lapPacket = decodePacket(lap.bytes);
@@ -184,7 +187,9 @@ describe("decoded bodies", () => {
       lapDistanceM: 512.5,
       currentLapNum: 4,
       pitStatus: 2,
+      numPitStops: 3,
       currentLapInvalid: true,
+      gridPosition: 7,
       driverStatus: 4,
     });
 
@@ -206,7 +211,9 @@ describe("decoded bodies", () => {
     const statusPacket = decodePacket(status.bytes);
     if (statusPacket.kind !== "carStatus") throw new Error(statusPacket.kind);
     expect(playerCar(statusPacket.cars, player).actualTyreCompound).toBe(16);
-    expect(playerCar(statusPacket.cars, player).ersStoreEnergy).toBe(0);
+    expect(playerCar(statusPacket.cars, player).visualTyreCompound).toBe(17);
+    expect(playerCar(statusPacket.cars, player).tyresAgeLaps).toBe(6);
+    expect(playerCar(statusPacket.cars, player).ersStoreEnergy).toBe(1_500_000);
 
     const historyPacket = decodePacket(history.bytes);
     if (historyPacket.kind !== "sessionHistory") throw new Error(historyPacket.kind);
@@ -289,9 +296,27 @@ describe("decoded bodies", () => {
       packetId: PacketId.FinalClassification,
       playerCarIndex: player,
     });
-    writer.seek(HEADER_SIZE + 1 + player * 46).uint8(1).skip(4).uint8(3);
+    writer.seek(HEADER_SIZE + 1 + player * 46).uint8(1).uint8(58).uint8(4).uint8(0).uint8(2).uint8(3).skip(5).double(90.5);
     const packet = decodePacket(writer.bytes);
     if (packet.kind !== "finalClassification") throw new Error(packet.kind);
-    expect(playerCar(packet.cars, player)).toEqual({ position: 1, resultStatus: 3 });
+    expect(playerCar(packet.cars, player)).toEqual({
+      position: 1,
+      resultStatus: 3,
+      gridPosition: 4,
+      numPitStops: 2,
+      totalRaceTimeS: 90.5,
+    });
+  });
+
+  it("reads AI difficulty and game mode from a full Session Packet", () => {
+    const writer = packetWithHeader(753, { packetFormat: 2025, packetId: PacketId.Session });
+    writer.uint8(0).int8(30).int8(22).uint8(50).uint16(5800).uint8(15).int8(11);
+    writer.bytes[HEADER_SIZE + 640] = 90;
+    writer.bytes[HEADER_SIZE + 665] = 5;
+    const packet = decodePacket(writer.bytes);
+    if (packet.kind !== "session") throw new Error(packet.kind);
+    expect(packet.data.aiDifficulty).toBe(90);
+    expect(packet.data.gameMode).toBe(5);
+    expect(packet.data.trackId).toBe(11);
   });
 });

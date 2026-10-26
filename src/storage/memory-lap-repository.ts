@@ -26,6 +26,7 @@ import {
   toSessionSummary,
   traceRoles,
 } from "./lap-rules";
+import { newUuid } from "./id";
 import { encodeTrace } from "./trace-codec";
 
 /** Same behaviour as the SQLite repository, kept in memory for tests. */
@@ -33,13 +34,14 @@ export class MemoryLapRepository implements LapRepository {
   private sessions: StoredSession[] = [];
   private laps: StoredLap[] = [];
   private traces = new Map<number, TraceSample[]>();
-  private pendingResults = new Map<string, Pick<SessionResult, "position" | "resultStatus">>();
+  private pendingResults = new Map<string, SessionResult>();
 
   async commitLap(lap: CompletedLap, traceRetention: TraceRetention = "fastest-latest"): Promise<number> {
     const session = this.findOrCreateSession(lap);
     const id = this.nextId(this.laps);
     this.laps.push({
       id,
+      uuid: newUuid(),
       sessionId: session.id,
       game: lap.session.game,
       trackId: lap.session.trackId,
@@ -50,8 +52,11 @@ export class MemoryLapRepository implements LapRepository {
       sector2Ms: lap.sector2Ms,
       sector3Ms: lap.sector3Ms,
       valid: lap.valid,
+      invalidReason: lap.invalidReason,
       teamId: lap.teamId,
       tyreCompound: lap.tyreCompound,
+      visualTyreCompound: lap.visualTyreCompound,
+      tyreAgeLaps: lap.tyreAgeLaps,
       trackTempC: lap.trackTempC,
       airTempC: lap.airTempC,
       setup: { ...lap.setup },
@@ -88,14 +93,14 @@ export class MemoryLapRepository implements LapRepository {
   async saveSessionResult(result: SessionResult): Promise<void> {
     const session = this.sessions.find((row) => row.game === result.game && row.sessionUid === result.sessionUid);
     if (!session) {
-      this.pendingResults.set(`${result.game}|${result.sessionUid}`, {
-        position: result.position,
-        resultStatus: result.resultStatus,
-      });
+      this.pendingResults.set(`${result.game}|${result.sessionUid}`, result);
       return;
     }
     session.position = result.position;
     session.resultStatus = result.resultStatus;
+    session.gridPosition = result.gridPosition;
+    session.pitStops = result.pitStops;
+    session.totalRaceTimeMs = result.totalRaceTimeMs;
   }
 
   async getSession(id: number): Promise<SessionDetail | null> {
@@ -109,6 +114,10 @@ export class MemoryLapRepository implements LapRepository {
       sessionUid: session.sessionUid,
       trackTempC: last?.trackTempC ?? 0,
       airTempC: last?.airTempC ?? 0,
+      aiDifficulty: session.aiDifficulty,
+      gridPosition: session.gridPosition,
+      pitStops: session.pitStops,
+      totalRaceTimeMs: session.totalRaceTimeMs,
       laps: laps.map((lap) => toLapSummary(lap, session, this.traces.has(lap.id), roles.get(lap.id) ?? null)),
     };
   }
@@ -186,11 +195,17 @@ export class MemoryLapRepository implements LapRepository {
   private findOrCreateSession(lap: CompletedLap): StoredSession {
     const { game, sessionUid, trackId, sessionType, gameMode } = lap.session;
     const existing = this.sessions.find((s) => s.game === game && s.sessionUid === sessionUid);
-    if (existing) return existing;
+    if (existing) {
+      existing.aiDifficulty = lap.session.aiDifficulty;
+      existing.gridPosition = lap.session.gridPosition;
+      existing.pitStops = lap.session.pitStops;
+      return existing;
+    }
     const pending = this.pendingResults.get(`${game}|${sessionUid}`);
     this.pendingResults.delete(`${game}|${sessionUid}`);
     const session: StoredSession = {
       id: this.nextId(this.sessions),
+      uuid: newUuid(),
       game,
       sessionUid,
       trackId,
@@ -199,6 +214,10 @@ export class MemoryLapRepository implements LapRepository {
       startedAt: sessionStartedAt(lap),
       resultStatus: pending?.resultStatus ?? 0,
       position: pending?.position ?? 0,
+      aiDifficulty: lap.session.aiDifficulty,
+      gridPosition: pending?.gridPosition ?? lap.session.gridPosition,
+      pitStops: pending?.pitStops ?? lap.session.pitStops,
+      totalRaceTimeMs: pending?.totalRaceTimeMs ?? 0,
     };
     this.sessions.push(session);
     return session;

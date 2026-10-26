@@ -4,6 +4,7 @@ import { decodePacket } from "@/protocol/decode";
 import { layout as f1_25 } from "@/protocol/f1-25";
 import { layout as f1_26 } from "@/protocol/f1-26";
 import { HEADER_SIZE, PacketId } from "@/protocol/header";
+import { carStatusPacketSize } from "@/protocol/common/car-status";
 import { LAP_DATA_CAR_BYTES, lapDataPacketSize } from "@/protocol/common/lap-data";
 import { EVENT_PACKET_BYTES } from "@/protocol/common/event";
 import { SESSION_HISTORY_PACKET_BYTES } from "@/protocol/common/session-history";
@@ -26,7 +27,7 @@ function session() {
     .int8(11).bytes;
 }
 
-function lap(lapNum: number, extra: { invalid?: boolean; pit?: boolean; lastMs?: number; frame?: number } = {}) {
+function lap(lapNum: number, extra: { invalid?: boolean; pit?: boolean; lastMs?: number; frame?: number; pits?: number; grid?: number } = {}) {
   return lapFor(FORMAT, PLAYER, lapNum, extra);
 }
 
@@ -34,7 +35,7 @@ function lapFor(
   format: 2025 | 2026,
   player: number,
   lapNum: number,
-  extra: { invalid?: boolean; pit?: boolean; lastMs?: number; frame?: number } = {},
+  extra: { invalid?: boolean; pit?: boolean; lastMs?: number; frame?: number; pits?: number; grid?: number } = {},
 ) {
   const layout = format === 2026 ? f1_26 : f1_25;
   const writer = packetWithHeader(lapDataPacketSize(layout), {
@@ -57,9 +58,11 @@ function lapFor(
     .uint8(1)
     .uint8(lapNum)
     .uint8(extra.pit ? 2 : 0)
-    .skip(2)
+    .uint8(extra.pits ?? 0)
+    .uint8(0)
     .uint8(extra.invalid ? 1 : 0)
-    .skip(6)
+    .skip(5)
+    .uint8(extra.grid ?? 0)
     .uint8(4);
   return writer.bytes;
 }
@@ -102,6 +105,20 @@ function pushAll(recorder: LapRecorder, packets: Uint8Array[], now = 1_000) {
 }
 
 describe("LapRecorder", () => {
+  it("stores the first Lap after the Session starts", () => {
+    const recorder = new LapRecorder();
+    const committed = pushAll(recorder, [
+      session(),
+      event("SSTA"),
+      lap(1),
+      lap(2, { lastMs: 90_000 }),
+      history([{ timeMs: 90_000, valid: true }]),
+    ]);
+    expect(committed).toHaveLength(1);
+    expect(committed[0]?.lapNumber).toBe(1);
+    expect(committed[0]?.lapTimeMs).toBe(90_000);
+  });
+
   it("does not store the Lap already in progress when it connects", () => {
     const recorder = new LapRecorder();
     const committed = pushAll(recorder, [session(), lap(2), lap(3), history([{ timeMs: 80_000, valid: true }])]);
@@ -122,6 +139,7 @@ describe("LapRecorder", () => {
     ]);
     expect(committed).toHaveLength(1);
     expect(committed[0]?.valid).toBe(true);
+    expect(committed[0]?.invalidReason).toBeNull();
     expect(committed[0]?.lapTimeMs).toBe(81_034);
     expect(committed[0]?.session.trackId).toBe(11);
     expect(committed[0]?.condition).toBe("dry");
@@ -141,6 +159,7 @@ describe("LapRecorder", () => {
     ]);
     expect(fromFlag).toHaveLength(1);
     expect(fromFlag[0]?.valid).toBe(false);
+    expect(fromFlag[0]?.invalidReason).toBeNull();
     expect(fromFlag[0]?.lapTimeMs).toBe(2);
 
     const hist = new LapRecorder();
@@ -156,15 +175,32 @@ describe("LapRecorder", () => {
     ]);
     expect(fromHistory).toHaveLength(1);
     expect(fromHistory[0]?.valid).toBe(false);
+    expect(fromHistory[0]?.invalidReason).toBeNull();
     expect(fromHistory[0]?.lapTimeMs).toBe(81_000);
   });
 
-  it("drops a pit Lap and a flashback", () => {
+  it("drops a pit Lap", () => {
     const pits = new LapRecorder();
     expect(pushAll(pits, [session(), lap(1), lap(2, { pit: true }), lap(3), history([{ timeMs: 1, valid: true }, { timeMs: 2, valid: true }])])).toEqual([]);
+  });
 
+  it("stores a flashback Lap as Invalid", () => {
     const flash = new LapRecorder();
-    expect(pushAll(flash, [session(), lap(1), lap(2), event("FLBK"), lap(3), history([{ timeMs: 1, valid: true }, { timeMs: 2, valid: true }])])).toEqual([]);
+    const committed = pushAll(flash, [
+      session(),
+      lap(1),
+      lap(2),
+      event("FLBK"),
+      lap(3),
+      history([
+        { timeMs: 1, valid: true },
+        { timeMs: 2, valid: true },
+      ]),
+    ]);
+    expect(committed).toHaveLength(1);
+    expect(committed[0]?.lapNumber).toBe(2);
+    expect(committed[0]?.valid).toBe(false);
+    expect(committed[0]?.invalidReason).toBe("flashback");
   });
 
   it("stores an Invalid Lap only when Config keeps them", () => {
@@ -232,6 +268,39 @@ describe("LapRecorder", () => {
     expect(committed).toHaveLength(1);
     expect(teamName(committed[0]!.teamId)).toBe(name);
     expect(committed[0]!.teamId).not.toBe(0);
+  });
+
+  it("keeps AI difficulty, grid, pit stops, and tyre age on the committed Lap", () => {
+    const recorder = new LapRecorder();
+    const fullSession = packetWithHeader(753, { packetFormat: FORMAT, packetId: PacketId.Session, playerCarIndex: PLAYER })
+      .uint8(0)
+      .int8(40)
+      .int8(20)
+      .uint8(0)
+      .uint16(7000)
+      .uint8(18)
+      .int8(11);
+    fullSession.bytes[HEADER_SIZE + 640] = 90;
+    const status = packetWithHeader(carStatusPacketSize(f1_25), {
+      packetFormat: FORMAT,
+      packetId: PacketId.CarStatus,
+      playerCarIndex: PLAYER,
+    });
+    status.seek(HEADER_SIZE + 25).uint8(18).uint8(16).uint8(4);
+
+    const committed = pushAll(recorder, [
+      fullSession.bytes,
+      status.bytes,
+      lap(1),
+      lap(2),
+      lap(3, { lastMs: 81_034, grid: 6, pits: 2 }),
+      history([{ timeMs: 90_000, valid: true }, { timeMs: 81_034, valid: true }]),
+    ]);
+    expect(committed).toHaveLength(1);
+    expect(committed[0]?.tyreCompound).toBe(18);
+    expect(committed[0]?.visualTyreCompound).toBe(16);
+    expect(committed[0]?.tyreAgeLaps).toBe(4);
+    expect(committed[0]?.session).toMatchObject({ aiDifficulty: 90, gridPosition: 6, pitStops: 2 });
   });
 
   it("commits the valid Lap from the recorded Spa clean-lap fixture", () => {

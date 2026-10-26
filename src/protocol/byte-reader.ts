@@ -48,6 +48,12 @@ export class ByteReader {
     return value;
   }
 
+  double(): number {
+    const value = this.view.getFloat64(this.offset, true);
+    this.offset += 8;
+    return value;
+  }
+
   bool(): boolean {
     return this.uint8() === 1;
   }

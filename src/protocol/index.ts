@@ -6,6 +6,7 @@ export { trackName, trackFlag, trackLabel, knownTrackIds } from "./tracks";
 export { isRaceSession, sessionTypeName } from "./session-types";
 export { F1_26_FORMAT_2025_MY_TEAM_ID, MY_TEAM_ID, recordedTeamId, teamName } from "./teams";
 export { gameModeName } from "./game-modes";
+export { tyreCompoundName, tyreKind, type TyreKind } from "./tyres";
 export {
   DriverStatus,
   PitStatus,

@@ -11,11 +11,12 @@ import { sectorColors } from "@/domain/sector-color";
 import { formatTemperature, type SpeedUnit } from "@/domain/units";
 import { gameModeName } from "@/protocol/game-modes";
 import { teamName } from "@/protocol/teams";
+import { tyreCompoundName, tyreKind, type TyreKind } from "@/protocol/tyres";
 import { trackLabel } from "@/protocol/tracks";
 import type { LapDetail, LapSummary, StoredTrace } from "@/storage/lap-repository";
 import { SettingsRepository } from "@/storage/settings-repository";
 import { ExpandGraphIcon } from "@/ui/header";
-import { LineChart } from "@/ui/LineChart";
+import { LineChart, type ChartMarker } from "@/ui/LineChart";
 import { SectorBar, sectorInk } from "@/ui/SectorBar";
 import { colors } from "@/ui/theme";
 import {
@@ -23,6 +24,7 @@ import {
   traceGraphSeries,
   traceGraphTitle,
   traceGraphYLabel,
+  traceSectorMarkers,
   type TraceGraphId,
 } from "@/ui/trace-graphs";
 
@@ -84,11 +86,12 @@ export default function LapDetailScreen() {
       <Text style={styles.muted}>
         {teamName(lap.teamId)} · {gameModeName(lap.gameMode)} · {lap.condition === "wet" ? "Wet" : "Dry"} ·{" "}
         {lap.game === "f1-26" ? "F1 26" : "F1 25"}
-        {lap.valid ? "" : " · Invalid"}
+        {lap.valid ? "" : ` · Invalid${lap.invalidReason === "flashback" ? " · Flashback" : ""}`}
       </Text>
       <Text style={styles.muted}>
         Track {formatTemperature(lap.trackTempC, "c")} · air {formatTemperature(lap.airTempC, "c")}
       </Text>
+      <TyreLine compound={lap.tyreCompound} visual={lap.visualTyreCompound} ageLaps={lap.tyreAgeLaps} />
       <Link href={`/laps/${lap.id}/setup`} asChild>
         <Pressable style={styles.setupBtn}>
           <Text style={styles.setupText}>Setup</Text>
@@ -153,6 +156,7 @@ export default function LapDetailScreen() {
               compare={compare}
               series={traceGraphSeries(graphId, trace, overlay, speedUnit)}
               yLabel={traceGraphYLabel(graphId, speedUnit)}
+              markers={traceSectorMarkers(trace, lap.sector1Ms, lap.sector2Ms)}
             />
           ))}
           {delta.length > 0 ? (
@@ -163,6 +167,8 @@ export default function LapDetailScreen() {
               title={`Delta vs Fastest (${formatDelta(delta.at(-1)!.deltaMs)})`}
               series={traceGraphSeries("delta", trace, fastest?.samples ?? null, speedUnit)}
               yLabel={traceGraphYLabel("delta", speedUnit)}
+              markers={traceSectorMarkers(trace, lap.sector1Ms, lap.sector2Ms)}
+              centerZero
             />
           ) : null}
         </>
@@ -175,6 +181,31 @@ export default function LapDetailScreen() {
   );
 }
 
+const TYRE_COLOR: Record<TyreKind, string> = {
+  soft: colors.accent,
+  medium: colors.yellow,
+  hard: colors.white,
+  intermediate: colors.green,
+  wet: colors.compare,
+};
+
+function ageText(ageLaps: number): string {
+  if (ageLaps < 0) return "-";
+  return ageLaps === 1 ? "1 lap" : `${ageLaps} laps`;
+}
+
+function TyreLine({ compound, visual, ageLaps }: { compound: number; visual: number; ageLaps: number }) {
+  if (compound <= 0) return <Text style={styles.muted}>-</Text>;
+  const age = ageText(ageLaps);
+  const kind = tyreKind(visual, compound);
+  return (
+    <Text style={styles.muted}>
+      <Text style={kind ? { color: TYRE_COLOR[kind] } : undefined}>{tyreCompoundName(compound)}</Text>
+      {` · ${age}`}
+    </Text>
+  );
+}
+
 function TraceGraphPreview({
   id,
   graphId,
@@ -182,6 +213,8 @@ function TraceGraphPreview({
   series,
   yLabel,
   title,
+  markers,
+  centerZero = false,
 }: {
   id: number;
   graphId: TraceGraphId;
@@ -189,6 +222,8 @@ function TraceGraphPreview({
   series: ReturnType<typeof traceGraphSeries>;
   yLabel: string;
   title?: string;
+  markers: readonly ChartMarker[];
+  centerZero?: boolean;
 }) {
   const name = title ?? traceGraphTitle(graphId);
   return (
@@ -201,7 +236,13 @@ function TraceGraphPreview({
           </Pressable>
         </Link>
       </View>
-      <LineChart xLabel="Distance (m)" yLabel={yLabel} series={series} />
+      <LineChart
+        xLabel="Distance (m)"
+        yLabel={yLabel}
+        series={series}
+        markers={markers}
+        centerZero={centerZero}
+      />
     </>
   );
 }

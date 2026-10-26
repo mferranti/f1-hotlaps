@@ -45,8 +45,16 @@ A Lap the Game counts.
 _Avoid_: Clean lap, legal lap
 
 **Invalid**:
-A Lap the Game does not count, such as one with a track limit or a cut.
+A Lap the Game does not count, such as one with a track limit or a cut. A Flashback is also Invalid.
 _Avoid_: Deleted lap, rejected lap
+
+**Flashback**:
+A rewind during a Lap. That Lap is Invalid.
+_Avoid_: Rewind, replay
+
+**Invalid reason**:
+Why a Lap is Invalid, when that is known. A Flashback has one. The Game's Invalid mark does not name a track limit or a cut.
+_Avoid_: Cause code
 
 **Condition**:
 The track's wetness when a Lap finishes: Dry or Wet.

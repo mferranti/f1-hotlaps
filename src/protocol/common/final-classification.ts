@@ -30,8 +30,13 @@ function classificationLayoutForSize(byteLength: number, layout: GameLayout): Ga
 
 function readCar(r: ByteReader): FinalClassificationData {
   const position = r.uint8();
-  r.skip(4); // numLaps, gridPosition, points, numPitStops
+  r.skip(1); // numLaps
+  const gridPosition = r.uint8();
+  r.skip(1); // points
+  const numPitStops = r.uint8();
   const resultStatus = r.uint8();
-  r.skip(AFTER_RESULT_STATUS);
-  return { position, resultStatus };
+  r.skip(5); // result reason, best lap time
+  const totalRaceTimeS = r.double();
+  r.skip(AFTER_RESULT_STATUS - 13);
+  return { position, resultStatus, gridPosition, numPitStops, totalRaceTimeS };
 }

@@ -60,6 +60,12 @@ export class ByteWriter {
     return this;
   }
 
+  double(value: number): this {
+    this.view.setFloat64(this.offset, value, true);
+    this.offset += 8;
+    return this;
+  }
+
   ascii(text: string): this {
     for (const char of text) this.uint8(char.charCodeAt(0));
     return this;

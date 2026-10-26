@@ -24,7 +24,7 @@ const GAME_MODES: Record<number, string> = {
   29: "Story",
 };
 
-/** Session Packet m_gameMode. Ids 1 and 2 come from live F1 25/26 Packets; the published appendix omits them. An id the table does not list is shown as "-". */
+/** Session Packet m_gameMode. An id the table does not list is shown as "-". */
 export function gameModeName(id: number): string {
   return GAME_MODES[id] ?? "-";
 }

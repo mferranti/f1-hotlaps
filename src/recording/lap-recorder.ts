@@ -18,19 +18,23 @@ interface PendingLap {
   condition: CompletedLap["condition"];
   teamId: number;
   tyreCompound: number;
+  visualTyreCompound: number;
+  tyreAgeLaps: number;
   trackTempC: number;
   airTempC: number;
   setup: CarSetup;
   finishedAt: number;
   trace: CompletedLap["trace"];
   gameInvalid: boolean;
+  flashback: boolean;
 }
 
 /**
  * Decides which finished circuits count as a Lap. The recorder must have seen
- * the Lap start, and Session History must report a time above zero. Pit stops,
- * flashbacks, and garage or in/out laps are dropped. A Lap the Game marks
- * Invalid is returned with valid set to false.
+ * the Lap start, and Session History must report a time above zero. A Session
+ * start counts as seeing the following Lap from the line. A flashback is
+ * stored with valid set to false. Pit stops and garage or in/out laps are
+ * dropped. A Lap the Game marks Invalid is returned with valid set to false.
  */
 export class LapRecorder {
   private sessionUid = "";
@@ -44,13 +48,21 @@ export class LapRecorder {
   private setup: CarSetup = {};
   private teamId = 255;
   private tyreCompound = 0;
+  private visualTyreCompound = 0;
+  private tyreAgeLaps = 0;
+  private aiDifficulty = -1;
+  private gridPosition = 0;
+  private pitStops = 0;
   private lastErs = 0;
   private lastFrame = 0;
   private player = 0;
   private observingLap: number | null = null;
   private started = false;
+  /** Set by Session start so the next Lap Data packet counts as the start of that Lap. */
+  private armFirstLap = false;
   private discarded = false;
   private gameInvalid = false;
+  private flashback = false;
   private lastDistanceM = 0;
   private lastElapsedMs = 0;
   private lastSector1Ms = 0;
@@ -63,8 +75,10 @@ export class LapRecorder {
     this.pending = null;
     this.observingLap = null;
     this.started = false;
+    this.armFirstLap = false;
     this.discarded = false;
     this.gameInvalid = false;
+    this.flashback = false;
     this.trace = new TraceBuilder();
   }
 
@@ -73,9 +87,15 @@ export class LapRecorder {
       this.reset();
       this.sessionUid = packet.header.sessionUid;
       this.game = packet.header.packetFormat === 2026 ? "f1-26" : "f1-25";
+      this.aiDifficulty = -1;
+      this.gridPosition = 0;
+      this.pitStops = 0;
+      this.tyreCompound = 0;
+      this.visualTyreCompound = 0;
+      this.tyreAgeLaps = 0;
     }
     this.player = packet.header.playerCarIndex;
-    if (packet.header.frameIdentifier < this.lastFrame) this.discarded = true;
+    if (packet.header.frameIdentifier < this.lastFrame) this.flashback = true;
     this.lastFrame = packet.header.frameIdentifier;
 
     switch (packet.kind) {
@@ -86,6 +106,7 @@ export class LapRecorder {
         this.sessionType = packet.data.sessionType;
         this.trackId = packet.data.trackId;
         this.gameMode = packet.data.gameMode;
+        this.aiDifficulty = packet.data.aiDifficulty;
         return undefined;
       case "participants":
         if (this.player < packet.cars.length) this.teamId = recordedTeamId(playerCar(packet.cars, this.player));
@@ -97,6 +118,8 @@ export class LapRecorder {
         if (this.player < packet.cars.length) {
           const car = playerCar(packet.cars, this.player);
           this.tyreCompound = car.actualTyreCompound;
+          this.visualTyreCompound = car.visualTyreCompound;
+          this.tyreAgeLaps = car.tyresAgeLaps;
           this.lastErs = car.ersStoreEnergy;
         }
         return undefined;
@@ -118,9 +141,10 @@ export class LapRecorder {
       case "lapData":
         return this.onLapData(packet, nowMs);
       case "event":
-        if (packet.event.code === "FLBK") this.discarded = true;
+        if (packet.event.code === "FLBK") this.flashback = true;
         if (packet.event.code === "SSTA" || packet.event.code === "SEND") {
           this.reset();
+          if (packet.event.code === "SSTA") this.armFirstLap = true;
         }
         return undefined;
       case "sessionHistory":
@@ -139,12 +163,15 @@ export class LapRecorder {
     this.lastElapsedMs = car.currentLapTimeMs;
     this.lastSector1Ms = car.sector1Ms;
     this.lastSector2Ms = car.sector2Ms;
+    this.gridPosition = car.gridPosition;
+    this.pitStops = car.numPitStops;
 
     this.latchInvalid(car);
 
     if (this.observingLap === null) {
       this.observingLap = car.currentLapNum;
-      this.started = false;
+      this.started = this.armFirstLap;
+      this.armFirstLap = false;
       return undefined;
     }
 
@@ -159,21 +186,26 @@ export class LapRecorder {
         condition: conditionFromWeather(this.weather),
         teamId: this.teamId,
         tyreCompound: this.tyreCompound,
+        visualTyreCompound: this.visualTyreCompound,
+        tyreAgeLaps: this.tyreAgeLaps,
         trackTempC: this.trackTempC,
         airTempC: this.airTempC,
         setup: { ...this.setup },
         finishedAt: nowMs,
         trace: this.trace.samples(),
         gameInvalid: this.gameInvalid,
+        flashback: this.flashback,
       };
     } else {
       this.pending = null;
     }
 
+    const rewound = car.currentLapNum < this.observingLap;
     this.observingLap = car.currentLapNum;
     this.started = true;
     this.discarded = false;
     this.gameInvalid = false;
+    this.flashback = rewound;
     this.trace = new TraceBuilder();
     this.lastDistanceM = car.lapDistanceM;
     this.lastElapsedMs = car.currentLapTimeMs;
@@ -206,16 +238,22 @@ export class LapRecorder {
         trackId: this.trackId,
         sessionType: this.sessionType,
         gameMode: this.gameMode,
+        aiDifficulty: this.aiDifficulty,
+        gridPosition: this.gridPosition,
+        pitStops: this.pitStops,
       },
       lapNumber: pending.lapNumber,
       lapTimeMs: entry.lapTimeMs,
       sector1Ms: entry.sector1Ms,
       sector2Ms: entry.sector2Ms,
       sector3Ms: entry.sector3Ms,
-      valid: !pending.gameInvalid && entry.lapValid,
+      valid: !pending.gameInvalid && !pending.flashback && entry.lapValid,
+      invalidReason: pending.flashback ? "flashback" : null,
       condition: pending.condition,
       teamId: pending.teamId,
       tyreCompound: pending.tyreCompound,
+      visualTyreCompound: pending.visualTyreCompound,
+      tyreAgeLaps: pending.tyreAgeLaps,
       trackTempC: pending.trackTempC,
       airTempC: pending.airTempC,
       setup: pending.setup,

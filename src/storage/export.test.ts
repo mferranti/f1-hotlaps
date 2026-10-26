@@ -1,10 +1,12 @@
 import { exportBody, EXPORT_FORMAT_VERSION, parseExport } from "./export";
+import { isUuid } from "./id";
 import type { StoredData } from "./lap-repository";
 
 const stored: StoredData = {
   sessions: [
     {
       id: 4,
+      uuid: "11111111-1111-4111-8111-111111111111",
       game: "f1-26",
       sessionUid: "99",
       trackId: 11,
@@ -13,11 +15,16 @@ const stored: StoredData = {
       startedAt: 1_700_000_000_000,
       resultStatus: 3,
       position: 1,
+      aiDifficulty: 90,
+      gridPosition: 4,
+      pitStops: 2,
+      totalRaceTimeMs: 5_400_000,
     },
   ],
   laps: [
     {
       id: 7,
+      uuid: "22222222-2222-4222-8222-222222222222",
       sessionId: 4,
       game: "f1-26",
       trackId: 11,
@@ -28,8 +35,11 @@ const stored: StoredData = {
       sector2Ms: 27_000,
       sector3Ms: 29_234,
       valid: true,
+      invalidReason: null,
       teamId: 8,
       tyreCompound: 16,
+      visualTyreCompound: 17,
+      tyreAgeLaps: 12,
       trackTempC: 40.5,
       airTempC: 28,
       setup: { frontWing: 8 },
@@ -66,6 +76,36 @@ describe("export", () => {
     expect(parseExport(exportBody(invalid, exportedAt)).laps[0]?.valid).toBe(false);
   });
 
+  it("reads an older format 1 file that has no grid, race time, or tyre age", () => {
+    const body = JSON.parse(exportBody(stored, exportedAt)) as {
+      sessions: Record<string, unknown>[];
+      laps: Record<string, unknown>[];
+    };
+    delete body.sessions[0]!.aiDifficulty;
+    delete body.sessions[0]!.gridPosition;
+    delete body.sessions[0]!.pitStops;
+    delete body.sessions[0]!.totalRaceTimeMs;
+    delete body.laps[0]!.visualTyreCompound;
+    delete body.laps[0]!.tyreAgeLaps;
+    delete body.laps[0]!.invalidReason;
+    delete body.sessions[0]!.uuid;
+    delete body.laps[0]!.uuid;
+
+    const parsed = parseExport(JSON.stringify(body));
+    expect(parsed.sessions[0]).toMatchObject({
+      aiDifficulty: -1,
+      gridPosition: 0,
+      pitStops: 0,
+      totalRaceTimeMs: 0,
+    });
+    expect(parsed.sessions[0]?.uuid).not.toBe(stored.sessions[0]?.uuid);
+    expect(isUuid(parsed.sessions[0]?.uuid)).toBe(true);
+    expect(isUuid(parsed.laps[0]?.uuid)).toBe(true);
+    expect(parsed.laps[0]?.invalidReason).toBeNull();
+    expect(parsed.laps[0]?.visualTyreCompound).toBe(0);
+    expect(parsed.laps[0]?.tyreAgeLaps).toBe(0);
+  });
+
   it("reads an older format 1 Lap with no valid field as Valid", () => {
     const body = JSON.parse(exportBody(stored, exportedAt)) as { laps: { valid?: boolean }[] };
     delete body.laps[0]!.valid;
@@ -90,5 +130,9 @@ describe("export", () => {
     };
     broken.laps[0]!.sessionId = 99;
     expect(() => parseExport(JSON.stringify(broken))).toThrow("This file is not an F1 Hotlaps export.");
+
+    const badUuid = JSON.parse(exportBody(stored, exportedAt)) as { laps: { uuid: string }[] };
+    badUuid.laps[0]!.uuid = "not-a-uuid";
+    expect(() => parseExport(JSON.stringify(badUuid))).toThrow("This file is not an F1 Hotlaps export.");
   });
 });

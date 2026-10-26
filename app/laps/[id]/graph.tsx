@@ -13,7 +13,13 @@ import { HeaderBackButton } from "@/ui/header";
 import { LandscapeFill } from "@/ui/LandscapeFill";
 import { LineChart } from "@/ui/LineChart";
 import { colors } from "@/ui/theme";
-import { parseTraceGraphId, traceGraphSeries, traceGraphTitle, traceGraphYLabel } from "@/ui/trace-graphs";
+import {
+  parseTraceGraphId,
+  traceGraphSeries,
+  traceGraphTitle,
+  traceGraphYLabel,
+  traceSectorMarkers,
+} from "@/ui/trace-graphs";
 
 export default function LapGraphScreen() {
   const { id, metric, compare: compareParam } = useLocalSearchParams<{
@@ -74,6 +80,8 @@ export default function LapGraphScreen() {
           xLabel="Distance (m)"
           yLabel={traceGraphYLabel(graphId, speedUnit)}
           series={traceGraphSeries(graphId, lap.trace, overlay, speedUnit)}
+          markers={traceSectorMarkers(lap.trace, lap.sector1Ms, lap.sector2Ms)}
+          centerZero={graphId === "delta"}
           height={chartH > 0 ? chartH : undefined}
         />
       </View>
