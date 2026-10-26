@@ -24,9 +24,9 @@ export default function RootLayout() {
         })}
       >
         <Stack.Screen name="index" options={{ title: "F1 Hotlaps" }} />
-        <Stack.Screen name="laps/index" options={{ title: "Laps history" }} />
+        <Stack.Screen name="laps/index" options={{ title: "Laps" }} />
         <Stack.Screen name="laps/[id]" options={{ headerShown: false, title: "Lap" }} />
-        <Stack.Screen name="sessions/index" options={{ title: "Sessions history" }} />
+        <Stack.Screen name="sessions/index" options={{ title: "Sessions" }} />
         <Stack.Screen name="sessions/[id]" options={{ title: "Session" }} />
         <Stack.Screen
           name="config"
