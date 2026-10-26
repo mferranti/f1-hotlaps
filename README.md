@@ -7,8 +7,13 @@ This project is not affiliated with, endorsed by, or connected to Electronic Art
 <table>
   <tr>
     <td align="center" width="33%"><img src="docs/screenshots/home.jpg" width="220" alt="Home, waiting for telemetry"><br>Home, waiting for telemetry</td>
-    <td align="center" width="33%"><img src="docs/screenshots/laps.jpg" width="220" alt="Laps on Spa, newest first"><br>Laps on Spa, newest first</td>
-    <td align="center" width="33%"><img src="docs/screenshots/lap.jpg" width="220" alt="A lap at Spa, compared with the fastest"><br>A lap at Spa, compared with the fastest</td>
+    <td align="center" width="33%"><img src="docs/screenshots/laps.jpg" width="220" alt="Laps on Catalunya, newest first"><br>Laps on Catalunya, newest first</td>
+    <td align="center" width="33%"><img src="docs/screenshots/filter.jpg" width="220" alt="Filter by tyre, condition, and Game Mode"><br>Filter by tyre, condition, and Game Mode</td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><img src="docs/screenshots/lap.jpg" width="220" alt="A lap at Catalunya, compared with the fastest"><br>A lap at Catalunya, compared with the fastest</td>
+    <td align="center" width="33%"><img src="docs/screenshots/setup.jpg" width="220" alt="Setup for the lap"><br>Setup for the lap</td>
+    <td align="center" width="33%"><img src="docs/screenshots/config.jpg" width="220" alt="Config"><br>Config</td>
   </tr>
 </table>
 

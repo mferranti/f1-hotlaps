@@ -133,6 +133,10 @@ export default function ConfigScreen() {
           />
         </View>
       </View>
+      <Text style={styles.note}>
+        Sessions, Laps, and Traces stay on this phone. Nothing is shared or sent to a server, so deleting the app
+        deletes them. Export a copy to keep them somewhere else, and Import to bring that copy back.
+      </Text>
       <Text style={styles.muted}>Using {formatMegabytes(usedBytes)}</Text>
       <Pressable style={styles.action} onPress={() => void exportLaps(lapRepository())}>
         <Text style={styles.actionText}>Export</Text>
@@ -347,6 +351,7 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: 16, fontWeight: "600" },
   value: { color: colors.text, fontSize: 18, fontVariant: ["tabular-nums"] },
   muted: { color: colors.muted },
+  note: { color: colors.muted, fontSize: 13, lineHeight: 18 },
   divider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },
   iconBtn: {
     borderWidth: 1,
