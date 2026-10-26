@@ -3,6 +3,7 @@ import type { SessionResult } from "./lap-repository";
 
 import { isUuid } from "./id";
 import { MemoryLapRepository } from "./memory-lap-repository";
+import { PAGE_SIZE } from "./page";
 
 function lap(overrides: Partial<CompletedLap> & Pick<CompletedLap, "lapTimeMs" | "finishedAt">): CompletedLap {
   return {
@@ -137,6 +138,7 @@ describe("MemoryLapRepository", () => {
 
     const dryMonza = await repo.listLaps({ trackId: 11, condition: "dry", sort: "fastest" });
     expect(dryMonza.map((row) => row.lapTimeMs)).toEqual([85_000]);
+    expect(dryMonza[0]).toMatchObject({ tyreCompound: 16, visualTyreCompound: 0 });
 
     const newest = await repo.listLaps({ sort: "newest" });
     expect(newest.map((row) => row.finishedAt)).toEqual([3, 2, 1]);
@@ -271,6 +273,66 @@ describe("MemoryLapRepository", () => {
     const remaining = await repo.listLaps({ sort: "fastest" });
     expect(remaining.map((row) => row.id)).toEqual([fastestMonza, fastestSpa]);
     expect(await traces(repo)).toEqual([fastestMonza, fastestSpa]);
+  });
+
+  it("pages Laps in sort order and stops when the cursor is exhausted", async () => {
+    const repo = new MemoryLapRepository();
+    for (let n = 1; n <= PAGE_SIZE + 1; n += 1) {
+      await repo.commitLap(lap({ lapTimeMs: 100_000 - n, finishedAt: n, lapNumber: n, valid: n !== 1 }));
+    }
+
+    const first = await repo.listLapPage({ sort: "newest", validOnly: true });
+    expect(first.items).toHaveLength(PAGE_SIZE);
+    expect(first.nextCursor).toBeNull();
+    expect(first.items.every((row) => row.valid)).toBe(true);
+
+    const newest = await repo.listLapPage({ sort: "newest" });
+    expect(newest.items).toHaveLength(PAGE_SIZE);
+    expect(newest.items[0]?.finishedAt).toBe(PAGE_SIZE + 1);
+    expect(newest.nextCursor).not.toBeNull();
+    const rest = await repo.listLapPage({ sort: "newest", cursor: newest.nextCursor });
+    expect(rest.items.map((row) => row.finishedAt)).toEqual([1]);
+    expect(rest.nextCursor).toBeNull();
+    expect(await repo.listLapPage({ sort: "newest", cursor: "n:0:0" })).toEqual({ items: [], nextCursor: null });
+
+    const fastest = await repo.listLapPage({ sort: "fastest", limit: 1 });
+    expect(fastest.items[0]?.lapTimeMs).toBe(100_000 - (PAGE_SIZE + 1));
+    const nextFastest = await repo.listLapPage({ sort: "fastest", limit: 1, cursor: fastest.nextCursor });
+    expect(nextFastest.items[0]?.lapTimeMs).toBe(100_000 - PAGE_SIZE);
+  });
+
+  it("pages Sessions newest first and lists filter values separately", async () => {
+    const repo = new MemoryLapRepository();
+    for (let n = 1; n <= PAGE_SIZE + 1; n += 1) {
+      await repo.commitLap(
+        lap({
+          lapTimeMs: 80_000,
+          finishedAt: n * 1_000,
+          lapNumber: 1,
+          teamId: n % 2,
+          session: info({ sessionUid: String(n), trackId: n % 2 === 0 ? 11 : 16, sessionType: n % 2 === 0 ? 15 : 18, gameMode: n % 2 === 0 ? 1 : 5 }),
+        }),
+      );
+    }
+
+    const first = await repo.listSessionPage({});
+    expect(first.items).toHaveLength(PAGE_SIZE);
+    expect(first.items[0]?.startedAt).toBeGreaterThan(first.items[1]?.startedAt ?? 0);
+    expect(first.nextCursor).not.toBeNull();
+    const rest = await repo.listSessionPage({ cursor: first.nextCursor });
+    expect(rest.items).toHaveLength(1);
+    expect(rest.nextCursor).toBeNull();
+
+    const monza = await repo.listSessionPage({ trackId: 11 });
+    expect(monza.items.every((row) => row.trackId === 11)).toBe(true);
+    expect(monza.nextCursor).toBeNull();
+
+    expect(await repo.listSessionFacets()).toEqual({
+      trackIds: [11, 16],
+      teamIds: [0, 1],
+      sessionTypes: [15, 18],
+    });
+    expect(await repo.listLapFacets(11)).toEqual({ gameModes: [1], teamIds: [0] });
   });
 });
 

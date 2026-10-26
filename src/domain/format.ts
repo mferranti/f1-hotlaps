@@ -1,4 +1,5 @@
 import type { Game } from "@/domain/types";
+import { imperialUnits, type SpeedUnit, type TemperatureUnit } from "@/domain/units";
 
 /** F1 25 or F1 26. */
 export function formatGame(game: Game): string {
@@ -23,6 +24,25 @@ export function formatSectorTime(ms: number): string {
 /** Stored size in megabytes, e.g. 0.0 MB or 2.4 MB. */
 export function formatMegabytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** `dd/mm/yy`, or `mm/dd/yy` when the metric system is mph and °F. */
+export function formatShortDate(ms: number, speedUnit: SpeedUnit, temperatureUnit: TemperatureUnit): string {
+  const date = new Date(ms);
+  const month = twoDigits(date.getMonth() + 1);
+  const day = twoDigits(date.getDate());
+  const year = twoDigits(date.getFullYear() % 100);
+  return imperialUnits(speedUnit, temperatureUnit) ? `${month}/${day}/${year}` : `${day}/${month}/${year}`;
+}
+
+/** Local clock time as HH:mm. */
+export function formatShortTime(ms: number): string {
+  const date = new Date(ms);
+  return `${twoDigits(date.getHours())}:${twoDigits(date.getMinutes())}`;
+}
+
+function twoDigits(value: number): string {
+  return String(value).padStart(2, "0");
 }
 
 /** Formats a time delta against the Fastest as signed seconds, e.g. +0.123 or -1.450. */

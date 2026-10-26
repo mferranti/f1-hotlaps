@@ -1,66 +1,91 @@
-import { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { Condition } from "@/domain/types";
 import { gameModeName } from "@/protocol/game-modes";
+import type { TyreKind } from "@/protocol/tyres";
 import { teamName } from "@/protocol/teams";
 import { trackLabel } from "@/protocol/tracks";
 import { lapRepository } from "@/capture/runtime";
-import type { LapSort, LapSummary } from "@/storage/lap-repository";
+import type { LapFacets, LapPageQuery, LapSort, LapSummary } from "@/storage/lap-repository";
 import { CheckRow } from "@/ui/CheckRow";
 import { Chip } from "@/ui/Chip";
-import { LapsTable } from "@/ui/LapsTable";
+import { LapRow, LapsEmpty, LapsHeader } from "@/ui/LapsTable";
+import { PagedList } from "@/ui/PagedList";
+import { TyreFilter } from "@/ui/TyreFilter";
+import { TYRE_KINDS } from "@/ui/tyre-filter";
 import { colors } from "@/ui/theme";
+import { usePage } from "@/ui/use-page";
+import { useSettings } from "@/ui/use-settings";
 
 export default function LapsHistoryScreen() {
   const [trackId, setTrackId] = useState<number | undefined>();
   const [condition, setCondition] = useState<Condition | undefined>();
   const [gameMode, setGameMode] = useState<number | undefined>();
   const [teamId, setTeamId] = useState<number | undefined>();
-  const [laps, setLaps] = useState<LapSummary[]>([]);
   const [tracks, setTracks] = useState<number[]>([]);
+  const [peers, setPeers] = useState<LapSummary[]>([]);
+  const [facets, setFacets] = useState<LapFacets>({ gameModes: [], teamIds: [] });
   const [trackOpen, setTrackOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [sort, setSort] = useState<LapSort>("newest");
   const [hideInvalid, setHideInvalid] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [tyres, setTyres] = useState<ReadonlySet<TyreKind>>(() => new Set(TYRE_KINDS));
+  const { speedUnit, temperatureUnit } = useSettings();
 
   const selectedTrackId = trackId ?? tracks[0];
+  const query = useMemo(() => {
+    if (selectedTrackId === undefined) return null;
+    return {
+      trackId: selectedTrackId,
+      sort,
+      condition,
+      gameMode,
+      teamId,
+      validOnly: hideInvalid,
+      tyreKinds: TYRE_KINDS.filter((kind) => tyres.has(kind)),
+    };
+  }, [selectedTrackId, sort, condition, gameMode, teamId, hideInvalid, tyres]);
+  const loadLaps = useCallback((pageQuery: LapPageQuery) => lapRepository().listLapPage(pageQuery), []);
+  const page = usePage(loadLaps, query);
+  const colorPeers = useMemo(() => peers.filter((peer) => peer.valid), [peers]);
+
+  const reloadTrack = useCallback(() => {
+    void lapRepository()
+      .listTracks()
+      .then((nextTracks) => {
+        setTracks(nextTracks);
+        const track = trackId ?? nextTracks[0];
+        if (track === undefined) {
+          setPeers([]);
+          setFacets({ gameModes: [], teamIds: [] });
+          return;
+        }
+        void Promise.all([
+          lapRepository().listLaps({ trackId: track, sort: "newest" }),
+          lapRepository().listLapFacets(track),
+        ]).then(([nextPeers, nextFacets]) => {
+          setPeers(nextPeers);
+          setFacets(nextFacets);
+        });
+      });
+  }, [trackId]);
 
   useEffect(() => {
-    void lapRepository().listTracks().then(setTracks);
-  }, []);
+    reloadTrack();
+  }, [reloadTrack]);
 
-  useEffect(() => {
-    if (selectedTrackId === undefined) return;
-    void lapRepository().listLaps({ trackId: selectedTrackId, sort }).then(setLaps);
-  }, [selectedTrackId, sort]);
-
-  async function refresh() {
-    const nextTracks = await lapRepository().listTracks();
-    setTracks(nextTracks);
-    const track = trackId ?? nextTracks[0];
-    if (track === undefined) {
-      setLaps([]);
-      return;
-    }
-    setLaps(await lapRepository().listLaps({ trackId: track, sort }));
+  function toggleTyre(kind: TyreKind) {
+    setTyres((current) => {
+      const next = new Set(current);
+      if (next.has(kind)) next.delete(kind);
+      else next.add(kind);
+      return next;
+    });
   }
 
-  const filtered = useMemo(
-    () =>
-      laps.filter(
-        (lap) =>
-          (!hideInvalid || lap.valid) &&
-          (condition === undefined || lap.condition === condition) &&
-          (gameMode === undefined || lap.gameMode === gameMode) &&
-          (teamId === undefined || lap.teamId === teamId),
-      ),
-    [laps, hideInvalid, condition, gameMode, teamId],
-  );
-
-  const modes = [...new Set(laps.map((lap) => lap.gameMode))].sort((a, b) => a - b);
-  const teams = [...new Set(laps.map((lap) => lap.teamId))].sort((a, b) => a - b);
+  const modes = facets.gameModes;
+  const teams = facets.teamIds;
 
   return (
     <View style={styles.screen}>
@@ -79,22 +104,31 @@ export default function LapsHistoryScreen() {
         <Chip label="Fastest" selected={sort === "fastest"} onPress={() => setSort("fastest")} />
       </View>
 
-      <ScrollView
+      <PagedList
+        items={page.items}
+        keyExtractor={(lap) => String(lap.id)}
+        hasMore={page.hasMore}
+        loadingMore={page.loadingMore}
+        onLoadMore={page.loadMore}
+        refreshing={page.refreshing}
+        onRefresh={() => {
+          void page.refresh();
+          void reloadTrack();
+        }}
         contentContainerStyle={styles.table}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              void refresh().finally(() => setRefreshing(false));
-            }}
-            tintColor={colors.accent}
-            colors={[colors.accent]}
+        listHeader={<LapsHeader showFinishedTime />}
+        listEmpty={page.loaded ? <LapsEmpty /> : null}
+        extraData={colorPeers}
+        renderItem={(lap) => (
+          <LapRow
+            lap={lap}
+            colorPeers={colorPeers}
+            showFinishedTime
+            speedUnit={speedUnit}
+            temperatureUnit={temperatureUnit}
           />
-        }
-      >
-        <LapsTable laps={filtered} peers={laps} />
-      </ScrollView>
+        )}
+      />
 
       <Modal visible={trackOpen} animationType="fade" transparent onRequestClose={() => setTrackOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setTrackOpen(false)}>
@@ -120,6 +154,8 @@ export default function LapsHistoryScreen() {
         <Pressable style={styles.backdrop} onPress={() => setFilterOpen(false)}>
           <View style={styles.sheet}>
             <Text style={styles.sheetTitle}>Filter</Text>
+            <Text style={styles.muted}>Tyre</Text>
+            <TyreFilter selected={tyres} onToggle={toggleTyre} />
             <Text style={styles.muted}>Condition</Text>
             <View style={styles.chips}>
               <Chip label="All" selected={condition === undefined} onPress={() => setCondition(undefined)} />

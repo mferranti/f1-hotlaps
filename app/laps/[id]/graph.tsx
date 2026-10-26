@@ -1,18 +1,16 @@
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import Storage from "expo-sqlite/kv-store";
 import { useEffect, useLayoutEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { lapRepository } from "@/capture/runtime";
 import type { TraceSample } from "@/domain/types";
-import type { SpeedUnit } from "@/domain/units";
 import type { LapDetail, StoredTrace } from "@/storage/lap-repository";
-import { SettingsRepository } from "@/storage/settings-repository";
 import { HeaderBackButton } from "@/ui/header";
 import { LandscapeFill } from "@/ui/LandscapeFill";
 import { LineChart } from "@/ui/LineChart";
 import { colors } from "@/ui/theme";
+import { useSettings } from "@/ui/use-settings";
 import {
   parseTraceGraphId,
   traceGraphScale,
@@ -33,12 +31,8 @@ export default function LapGraphScreen() {
   const navigation = useNavigation();
   const [lap, setLap] = useState<LapDetail | null>(null);
   const [fastest, setFastest] = useState<StoredTrace | null>(null);
-  const [speedUnit, setSpeedUnit] = useState<SpeedUnit>("kph");
   const [chartH, setChartH] = useState(0);
-
-  useEffect(() => {
-    void new SettingsRepository(Storage).get().then((settings) => setSpeedUnit(settings.speedUnit));
-  }, []);
+  const settings = useSettings();
 
   useEffect(() => {
     void (async () => {
@@ -79,8 +73,8 @@ export default function LapGraphScreen() {
       <View style={styles.chart} onLayout={(event) => setChartH(event.nativeEvent.layout.height)}>
         <LineChart
           xLabel="Distance (m)"
-          yLabel={traceGraphYLabel(graphId, speedUnit)}
-          series={traceGraphSeries(graphId, lap.trace, overlay, speedUnit)}
+          yLabel={traceGraphYLabel(graphId, settings.speedUnit)}
+          series={traceGraphSeries(graphId, lap.trace, overlay, settings.speedUnit)}
           markers={traceSectorMarkers(lap.trace, lap.sector1Ms, lap.sector2Ms)}
           centerZero={graphId === "delta"}
           yScale={traceGraphScale(graphId)}

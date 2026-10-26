@@ -1,5 +1,4 @@
 import { Link, useLocalSearchParams } from "expo-router";
-import Storage from "expo-sqlite/kv-store";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 
@@ -8,17 +7,18 @@ import { deltaByDistance } from "@/domain/delta";
 import { compareToFastest } from "@/domain/fastest-compare";
 import { formatDelta } from "@/domain/format";
 import { sectorColors } from "@/domain/sector-color";
-import { formatTemperature, type SpeedUnit } from "@/domain/units";
+import { formatTemperature } from "@/domain/units";
 import { gameModeName } from "@/protocol/game-modes";
 import { teamName } from "@/protocol/teams";
-import { tyreCompoundName, tyreKind, type TyreKind } from "@/protocol/tyres";
+import { tyreCompoundName, tyreKind } from "@/protocol/tyres";
 import { trackLabel } from "@/protocol/tracks";
 import type { LapDetail, LapSummary, StoredTrace } from "@/storage/lap-repository";
-import { SettingsRepository } from "@/storage/settings-repository";
 import { ExpandGraphIcon } from "@/ui/header";
+import { TyreIcon } from "@/ui/TyreIcon";
 import { LineChart, type ChartMarker } from "@/ui/LineChart";
 import { SectorBar, sectorInk } from "@/ui/SectorBar";
 import { colors } from "@/ui/theme";
+import { useSettings } from "@/ui/use-settings";
 import {
   TRACE_GRAPH_IDS,
   traceGraphScale,
@@ -35,11 +35,7 @@ export default function LapDetailScreen() {
   const [peers, setPeers] = useState<LapSummary[]>([]);
   const [fastest, setFastest] = useState<StoredTrace | null>(null);
   const [compare, setCompare] = useState(false);
-  const [speedUnit, setSpeedUnit] = useState<SpeedUnit>("kph");
-
-  useEffect(() => {
-    void new SettingsRepository(Storage).get().then((settings) => setSpeedUnit(settings.speedUnit));
-  }, []);
+  const settings = useSettings();
 
   useEffect(() => {
     void (async () => {
@@ -90,7 +86,7 @@ export default function LapDetailScreen() {
         {lap.valid ? "" : ` · Invalid${lap.invalidReason === "flashback" ? " · Flashback" : ""}`}
       </Text>
       <Text style={styles.muted}>
-        Track {formatTemperature(lap.trackTempC, "c")} · air {formatTemperature(lap.airTempC, "c")}
+        Track {formatTemperature(lap.trackTempC, settings.temperatureUnit)} · air {formatTemperature(lap.airTempC, settings.temperatureUnit)}
       </Text>
       <TyreLine compound={lap.tyreCompound} visual={lap.visualTyreCompound} ageLaps={lap.tyreAgeLaps} />
       <Link href={`/laps/${lap.id}/setup`} asChild>
@@ -155,8 +151,8 @@ export default function LapDetailScreen() {
               id={lap.id}
               graphId={graphId}
               compare={compare}
-              series={traceGraphSeries(graphId, trace, overlay, speedUnit)}
-              yLabel={traceGraphYLabel(graphId, speedUnit)}
+              series={traceGraphSeries(graphId, trace, overlay, settings.speedUnit)}
+              yLabel={traceGraphYLabel(graphId, settings.speedUnit)}
               markers={traceSectorMarkers(trace, lap.sector1Ms, lap.sector2Ms)}
             />
           ))}
@@ -166,8 +162,8 @@ export default function LapDetailScreen() {
               graphId="delta"
               compare={compare}
               title={`Delta vs Fastest (${formatDelta(delta.at(-1)!.deltaMs)})`}
-              series={traceGraphSeries("delta", trace, fastest?.samples ?? null, speedUnit)}
-              yLabel={traceGraphYLabel("delta", speedUnit)}
+              series={traceGraphSeries("delta", trace, fastest?.samples ?? null, settings.speedUnit)}
+              yLabel={traceGraphYLabel("delta", settings.speedUnit)}
               markers={traceSectorMarkers(trace, lap.sector1Ms, lap.sector2Ms)}
               centerZero
             />
@@ -182,14 +178,6 @@ export default function LapDetailScreen() {
   );
 }
 
-const TYRE_COLOR: Record<TyreKind, string> = {
-  soft: colors.accent,
-  medium: colors.yellow,
-  hard: colors.white,
-  intermediate: colors.green,
-  wet: colors.compare,
-};
-
 function ageText(ageLaps: number): string {
   if (ageLaps < 0) return "-";
   return ageLaps === 1 ? "1 lap" : `${ageLaps} laps`;
@@ -199,11 +187,18 @@ function TyreLine({ compound, visual, ageLaps }: { compound: number; visual: num
   if (compound <= 0) return <Text style={styles.muted}>-</Text>;
   const age = ageText(ageLaps);
   const kind = tyreKind(visual, compound);
+  if (!kind) {
+    return (
+      <Text style={styles.muted}>
+        {tyreCompoundName(compound)} · {age}
+      </Text>
+    );
+  }
   return (
-    <Text style={styles.muted}>
-      <Text style={kind ? { color: TYRE_COLOR[kind] } : undefined}>{tyreCompoundName(compound)}</Text>
-      {` · ${age}`}
-    </Text>
+    <View style={styles.tyreRow}>
+      <TyreIcon kind={kind} />
+      <Text style={styles.muted}>{age}</Text>
+    </View>
   );
 }
 
@@ -262,6 +257,7 @@ const styles = StyleSheet.create({
   graphHead: { flexDirection: "row", alignItems: "center", gap: 8 },
   graphTitle: { flex: 1 },
   muted: { color: colors.muted },
+  tyreRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   setupBtn: {
     alignSelf: "flex-start",
     borderWidth: 1,

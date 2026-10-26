@@ -1,4 +1,12 @@
-import { formatDelta, formatGame, formatLapTime, formatMegabytes, formatSectorTime } from "@/domain/format";
+import {
+  formatDelta,
+  formatGame,
+  formatLapTime,
+  formatMegabytes,
+  formatSectorTime,
+  formatShortDate,
+  formatShortTime,
+} from "@/domain/format";
 
 describe("formatGame", () => {
   it("names F1 25 and F1 26", () => {
@@ -36,6 +44,33 @@ describe("formatMegabytes", () => {
   it("shows stored size in MB", () => {
     expect(formatMegabytes(0)).toBe("0.0 MB");
     expect(formatMegabytes(2 * 1024 * 1024)).toBe("2.0 MB");
+  });
+});
+
+describe("formatShortDate", () => {
+  const oct26 = new Date(2026, 9, 26).getTime();
+  const jan5 = new Date(2026, 0, 5).getTime();
+
+  it("uses dd/mm/yy on the metric system", () => {
+    expect(formatShortDate(oct26, "kph", "c")).toBe("26/10/26");
+    expect(formatShortDate(jan5, "kph", "c")).toBe("05/01/26");
+  });
+
+  it("uses mm/dd/yy when speed is mph and temperature is °F", () => {
+    expect(formatShortDate(oct26, "mph", "f")).toBe("10/26/26");
+    expect(formatShortDate(jan5, "mph", "f")).toBe("01/05/26");
+  });
+
+  it("stays day-first unless both units are imperial", () => {
+    expect(formatShortDate(oct26, "mph", "c")).toBe("26/10/26");
+    expect(formatShortDate(oct26, "kph", "f")).toBe("26/10/26");
+  });
+});
+
+describe("formatShortTime", () => {
+  it("uses the local clock as HH:mm", () => {
+    expect(formatShortTime(new Date(2026, 9, 26, 9, 5).getTime())).toBe("09:05");
+    expect(formatShortTime(new Date(2026, 9, 26, 18, 0).getTime())).toBe("18:00");
   });
 });
 

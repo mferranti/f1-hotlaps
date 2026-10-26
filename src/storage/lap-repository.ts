@@ -8,6 +8,9 @@ import type {
   TraceRole,
   TraceSample,
 } from "@/domain/types";
+import type { TyreKind } from "@/protocol/tyres";
+
+import type { Page } from "./page";
 
 export type LapSort = "newest" | "fastest";
 
@@ -17,6 +20,21 @@ export interface LapQuery {
   gameMode?: number;
   teamId?: number;
   sort: LapSort;
+}
+
+/** A Lap history page. Filters apply before the cursor, so each page is a full page of matches. */
+export interface LapPageQuery extends LapQuery {
+  /** When true, Invalid Laps are omitted. */
+  validOnly?: boolean;
+  /** Painted tyres to keep. Omitted keeps every tyre, including a Lap with no painted tyre. */
+  tyreKinds?: readonly TyreKind[];
+  cursor?: string | null;
+  limit?: number;
+}
+
+export interface LapFacets {
+  gameModes: number[];
+  teamIds: number[];
 }
 
 export interface LapSummary {
@@ -35,6 +53,10 @@ export interface LapSummary {
   /** False when the Lap does not count. */
   valid: boolean;
   condition: Condition;
+  /** Actual compound id. 0 when no Car Status was seen. */
+  tyreCompound: number;
+  /** Visual compound id. 0 when no Car Status was seen. */
+  visualTyreCompound: number;
   finishedAt: number;
   hasTrace: boolean;
   role: TraceRole | null;
@@ -42,8 +64,6 @@ export interface LapSummary {
 
 export interface LapDetail extends LapSummary {
   invalidReason: InvalidReason | null;
-  tyreCompound: number;
-  visualTyreCompound: number;
   tyreAgeLaps: number;
   trackTempC: number;
   airTempC: number;
@@ -124,6 +144,17 @@ export interface SessionQuery {
   validOnly?: boolean;
 }
 
+export interface SessionPageQuery extends SessionQuery {
+  cursor?: string | null;
+  limit?: number;
+}
+
+export interface SessionFacets {
+  trackIds: number[];
+  teamIds: number[];
+  sessionTypes: number[];
+}
+
 export interface SessionSummary {
   id: number;
   game: Game;
@@ -154,7 +185,15 @@ export interface LapRepository {
   /** Stores the Lap and its Trace, then drops Traces the retention setting does not keep. Returns the Lap id. */
   commitLap(lap: CompletedLap, traceRetention?: TraceRetention): Promise<number>;
   listLaps(query: LapQuery): Promise<LapSummary[]>;
+  /** One page of Laps in the query's sort. `nextCursor` is null when no further page exists. */
+  listLapPage(query: LapPageQuery): Promise<Page<LapSummary>>;
+  /** Game modes and teams on a track, for the history filters. */
+  listLapFacets(trackId: number): Promise<LapFacets>;
   listSessions(query?: SessionQuery): Promise<SessionSummary[]>;
+  /** One page of Sessions, newest first. `nextCursor` is null when no further page exists. */
+  listSessionPage(query?: SessionPageQuery): Promise<Page<SessionSummary>>;
+  /** Tracks, teams, and Session types for the history filters. */
+  listSessionFacets(query?: Pick<SessionQuery, "validOnly">): Promise<SessionFacets>;
   getSession(id: number): Promise<SessionDetail | null>;
   saveSessionResult(result: SessionResult): Promise<void>;
   getLap(id: number): Promise<LapDetail | null>;

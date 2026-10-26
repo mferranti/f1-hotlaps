@@ -7,24 +7,17 @@ import Svg, { Path, Rect } from "react-native-svg";
 
 import { restartRuntime, lapRepository } from "@/capture/runtime";
 import { formatMegabytes } from "@/domain/format";
+import { imperialUnits } from "@/domain/units";
 import { exportLaps, pickExport } from "@/storage/export";
 import type { StoredData } from "@/storage/lap-repository";
-import { SettingsRepository, validatePort, type Settings } from "@/storage/settings-repository";
+import { DEFAULT_SETTINGS, SettingsRepository, validatePort, type Settings } from "@/storage/settings-repository";
 import { colors } from "@/ui/theme";
 
 const settings = new SettingsRepository(Storage);
 
-const DEFAULTS: Settings = {
-  port: 20777,
-  speedUnit: "kph",
-  temperatureUnit: "c",
-  traceRetention: "all",
-  storeInvalidLaps: true,
-};
-
 export default function ConfigScreen() {
   const [lan, setLan] = useState("");
-  const [draft, setDraft] = useState<Settings>(DEFAULTS);
+  const [draft, setDraft] = useState<Settings>(DEFAULT_SETTINGS);
   const [portOpen, setPortOpen] = useState(false);
   const [wipeOpen, setWipeOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -44,7 +37,7 @@ export default function ConfigScreen() {
     void lapRepository().usedBytes().then(setUsedBytes);
   }, []);
 
-  const imperial = draft.speedUnit === "mph" && draft.temperatureUnit === "f";
+  const imperial = imperialUnits(draft.speedUnit, draft.temperatureUnit);
   const keepAllTraces = draft.traceRetention === "all";
 
   return (

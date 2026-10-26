@@ -2,10 +2,14 @@ import type { CompletedLap, Condition, Game, TraceRetention, TraceSample } from 
 
 import type {
   LapDetail,
+  LapFacets,
+  LapPageQuery,
   LapQuery,
   LapRepository,
   LapSummary,
   SessionDetail,
+  SessionFacets,
+  SessionPageQuery,
   SessionQuery,
   SessionResult,
   SessionSummary,
@@ -17,15 +21,20 @@ import type {
 import {
   fastestIds,
   keptTraceIds,
+  lapFacets,
+  lapPage,
   listSessionSummaries,
   matchesQuery,
+  sessionFacets,
   sessionLapsOldestFirst,
+  sessionPage,
   sessionStartedAt,
   sortLaps,
   toLapSummary,
   toSessionSummary,
   traceRoles,
 } from "./lap-rules";
+import type { Page } from "./page";
 import { newUuid } from "./id";
 import { encodeTrace } from "./trace-codec";
 
@@ -86,8 +95,24 @@ export class MemoryLapRepository implements LapRepository {
     );
   }
 
+  async listLapPage(query: LapPageQuery): Promise<Page<LapSummary>> {
+    return lapPage(await this.listLaps(query), query);
+  }
+
+  async listLapFacets(trackId: number): Promise<LapFacets> {
+    return lapFacets(await this.listLaps({ trackId, sort: "newest" }));
+  }
+
   async listSessions(query: SessionQuery = {}): Promise<SessionSummary[]> {
     return listSessionSummaries(this.sessions, this.laps, query);
+  }
+
+  async listSessionPage(query: SessionPageQuery = {}): Promise<Page<SessionSummary>> {
+    return sessionPage(await this.listSessions(query), query);
+  }
+
+  async listSessionFacets(query: Pick<SessionQuery, "validOnly"> = {}): Promise<SessionFacets> {
+    return sessionFacets(await this.listSessions(query));
   }
 
   async saveSessionResult(result: SessionResult): Promise<void> {

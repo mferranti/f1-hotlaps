@@ -3,6 +3,11 @@ export type TemperatureUnit = "c" | "f";
 
 const MPH_PER_KPH = 0.621371;
 
+/** The Config switch sets mph and °F together. */
+export function imperialUnits(speedUnit: SpeedUnit, temperatureUnit: TemperatureUnit): boolean {
+  return speedUnit === "mph" && temperatureUnit === "f";
+}
+
 export function speedValue(kph: number, unit: SpeedUnit): number {
   return unit === "mph" ? kph * MPH_PER_KPH : kph;
 }

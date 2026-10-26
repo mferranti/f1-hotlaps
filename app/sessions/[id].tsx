@@ -3,9 +3,9 @@ import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { lapRepository } from "@/capture/runtime";
-import { formatGame, formatLapTime } from "@/domain/format";
+import { formatGame, formatLapTime, formatShortDate } from "@/domain/format";
 import { sessionConditionLabel, sessionResultLabel } from "@/domain/session-result";
-import { formatTemperature } from "@/domain/units";
+import { formatTemperature, type SpeedUnit, type TemperatureUnit } from "@/domain/units";
 import { gameModeName } from "@/protocol/game-modes";
 import { isRaceSession, sessionTypeName } from "@/protocol/session-types";
 import { teamName } from "@/protocol/teams";
@@ -14,11 +14,13 @@ import type { SessionDetail } from "@/storage/lap-repository";
 import { CheckRow } from "@/ui/CheckRow";
 import { LapsTable } from "@/ui/LapsTable";
 import { colors } from "@/ui/theme";
+import { useSettings } from "@/ui/use-settings";
 
 export default function SessionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [session, setSession] = useState<SessionDetail | null>(null);
   const [hideInvalid, setHideInvalid] = useState(true);
+  const { speedUnit, temperatureUnit } = useSettings();
 
   useEffect(() => {
     void lapRepository()
@@ -49,8 +51,8 @@ export default function SessionDetailScreen() {
         <Fact label="Game mode" value={gameModeName(session.gameMode)} />
         <Fact label="Team" value={teamName(session.teamId)} />
         <Fact label="Condition" value={sessionConditionLabel(session.laps)} />
-        <Fact label="Started" value={formatWhen(session.startedAt)} />
-        <Fact label="Ended" value={formatWhen(session.finishedAt)} />
+        <Fact label="Started" value={formatWhen(session.startedAt, speedUnit, temperatureUnit)} />
+        <Fact label="Ended" value={formatWhen(session.finishedAt, speedUnit, temperatureUnit)} />
         <Fact label="Laps" value={String(shown.length)} />
         <Fact label="Fastest" value={session.fastestLapTimeMs === 0 ? "-" : formatLapTime(session.fastestLapTimeMs)} />
         <Fact label="Result" value={result} />
@@ -58,8 +60,8 @@ export default function SessionDetailScreen() {
         <Fact label="Pit stops" value={session.pitStops < 0 ? "-" : String(session.pitStops)} />
         <Fact label="Race time" value={session.totalRaceTimeMs > 0 ? formatLapTime(session.totalRaceTimeMs) : "-"} />
         <Fact label="AI difficulty" value={session.aiDifficulty < 0 ? "-" : String(session.aiDifficulty)} />
-        <Fact label="Track temp" value={session.lapCount > 0 ? formatTemperature(session.trackTempC, "c") : "-"} />
-        <Fact label="Air temp" value={session.lapCount > 0 ? formatTemperature(session.airTempC, "c") : "-"} />
+        <Fact label="Track temp" value={session.lapCount > 0 ? formatTemperature(session.trackTempC, temperatureUnit) : "-"} />
+        <Fact label="Air temp" value={session.lapCount > 0 ? formatTemperature(session.airTempC, temperatureUnit) : "-"} />
       </View>
       <Text style={styles.section}>Laps</Text>
       <CheckRow
@@ -82,14 +84,9 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
-function formatWhen(ms: number): string {
-  return new Date(ms).toLocaleString(undefined, {
-    month: "numeric",
-    day: "numeric",
-    year: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function formatWhen(ms: number, speedUnit: SpeedUnit, temperatureUnit: TemperatureUnit): string {
+  const time = new Date(ms).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return `${formatShortDate(ms, speedUnit, temperatureUnit)} ${time}`;
 }
 
 const styles = StyleSheet.create({

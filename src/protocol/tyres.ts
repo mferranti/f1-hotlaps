@@ -63,3 +63,13 @@ export function tyreKind(visualCompound: number, actualCompound: number): TyreKi
   if (visualCompound > 0 && VISUAL_KIND[visualCompound]) return VISUAL_KIND[visualCompound];
   return ACTUAL_KIND[actualCompound] ?? null;
 }
+
+/** A Lap stays when its painted tyre is checked. A Lap with no painted tyre always stays. */
+export function tyreFilterMatches(
+  visualTyreCompound: number,
+  tyreCompound: number,
+  selected: ReadonlySet<TyreKind>,
+): boolean {
+  const kind = tyreKind(visualTyreCompound, tyreCompound);
+  return kind === null || selected.has(kind);
+}

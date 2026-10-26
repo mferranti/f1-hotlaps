@@ -4,10 +4,14 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import { getDatabase } from "./db";
 import type {
   LapDetail,
+  LapFacets,
+  LapPageQuery,
   LapQuery,
   LapRepository,
   LapSummary,
   SessionDetail,
+  SessionFacets,
+  SessionPageQuery,
   SessionQuery,
   SessionResult,
   SessionSummary,
@@ -18,15 +22,20 @@ import type {
 import {
   fastestIds,
   keptTraceIds,
+  lapFacets,
+  lapPage,
   listSessionSummaries,
   matchesQuery,
+  sessionFacets,
   sessionLapsOldestFirst,
+  sessionPage,
   sessionStartedAt,
   sortLaps,
   toLapSummary,
   toSessionSummary,
   traceRoles,
 } from "./lap-rules";
+import type { Page } from "./page";
 import { newUuid } from "./id";
 import { decodeTrace, encodeTrace } from "./trace-codec";
 
@@ -142,11 +151,27 @@ export class SqliteLapRepository implements LapRepository {
     });
   }
 
+  async listLapPage(query: LapPageQuery): Promise<Page<LapSummary>> {
+    return lapPage(await this.listLaps(query), query);
+  }
+
+  async listLapFacets(trackId: number): Promise<LapFacets> {
+    return lapFacets(await this.listLaps({ trackId, sort: "newest" }));
+  }
+
   async listSessions(query: SessionQuery = {}): Promise<SessionSummary[]> {
     const db = await this.open();
     const sessions = await db.getAllAsync<StoredSessionRow>("SELECT * FROM sessions");
     const laps = await db.getAllAsync<LapRow>("SELECT * FROM laps");
     return listSessionSummaries(sessions.map(toStoredSession), laps.map(toStoredLap), query);
+  }
+
+  async listSessionPage(query: SessionPageQuery = {}): Promise<Page<SessionSummary>> {
+    return sessionPage(await this.listSessions(query), query);
+  }
+
+  async listSessionFacets(query: Pick<SessionQuery, "validOnly"> = {}): Promise<SessionFacets> {
+    return sessionFacets(await this.listSessions(query));
   }
 
   async saveSessionResult(result: SessionResult): Promise<void> {

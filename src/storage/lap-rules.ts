@@ -1,15 +1,21 @@
 import { tracedLaps, type RetentionCandidate } from "@/domain/trace-retention";
 import type { CompletedLap, Condition, Game, TraceRetention, TraceRole } from "@/domain/types";
+import { tyreFilterMatches } from "@/protocol/tyres";
 
 import type {
+  LapFacets,
+  LapPageQuery,
   LapQuery,
   LapSort,
   LapSummary,
+  SessionFacets,
+  SessionPageQuery,
   SessionQuery,
   SessionSummary,
   StoredLap,
   StoredSession,
 } from "./lap-repository";
+import { PAGE_SIZE, pageBy, type Page } from "./page";
 
 export interface GroupedLap extends RetentionCandidate {
   game: Game;
@@ -87,6 +93,53 @@ export function sortLaps<T extends SortableLap>(laps: readonly T[], sort: LapSor
   return [...laps].sort(comparators[sort]);
 }
 
+/** Position in the Lap sort. The id breaks a tie the same way `sortLaps` does. */
+function lapCursor(lap: Pick<LapSummary, "finishedAt" | "lapTimeMs" | "id">, sort: LapSort): string {
+  return sort === "newest" ? `n:${lap.finishedAt}:${lap.id}` : `f:${lap.lapTimeMs}:${lap.finishedAt}:${lap.id}`;
+}
+
+function sessionCursor(session: Pick<SessionSummary, "startedAt" | "id">): string {
+  return `s:${session.startedAt}:${session.id}`;
+}
+
+function matchesLapPage(lap: LapSummary, query: LapPageQuery): boolean {
+  if (query.validOnly && !lap.valid) return false;
+  if (query.tyreKinds === undefined) return true;
+  return tyreFilterMatches(lap.visualTyreCompound, lap.tyreCompound, new Set(query.tyreKinds));
+}
+
+/** `laps` is already sorted. Valid and tyre filters run before the cursor. */
+export function lapPage(laps: readonly LapSummary[], query: LapPageQuery): Page<LapSummary> {
+  const filtered = laps.filter((lap) => matchesLapPage(lap, query));
+  return pageBy(filtered, query.cursor, query.limit ?? PAGE_SIZE, (lap) => lapCursor(lap, query.sort));
+}
+
+/** `sessions` is already newest-first. */
+export function sessionPage(sessions: readonly SessionSummary[], query: SessionPageQuery = {}): Page<SessionSummary> {
+  return pageBy(sessions, query.cursor, query.limit ?? PAGE_SIZE, sessionCursor);
+}
+
+export function lapFacets(laps: readonly Pick<LapSummary, "gameMode" | "teamId">[]): LapFacets {
+  return {
+    gameModes: uniqueSorted(laps.map((lap) => lap.gameMode)),
+    teamIds: uniqueSorted(laps.map((lap) => lap.teamId)),
+  };
+}
+
+export function sessionFacets(
+  sessions: readonly Pick<SessionSummary, "trackId" | "teamId" | "sessionType">[],
+): SessionFacets {
+  return {
+    trackIds: uniqueSorted(sessions.map((session) => session.trackId)),
+    teamIds: uniqueSorted(sessions.map((session) => session.teamId)),
+    sessionTypes: uniqueSorted(sessions.map((session) => session.sessionType)),
+  };
+}
+
+function uniqueSorted(values: readonly number[]): number[] {
+  return [...new Set(values)].sort((a, b) => a - b);
+}
+
 export function matchesSessionQuery(
   session: Pick<SessionSummary, "trackId" | "teamId" | "sessionType">,
   query: SessionQuery,
@@ -149,6 +202,8 @@ export function toLapSummary(
     sector3Ms: lap.sector3Ms,
     valid: lap.valid,
     condition: lap.condition,
+    tyreCompound: lap.tyreCompound,
+    visualTyreCompound: lap.visualTyreCompound,
     finishedAt: lap.finishedAt,
     hasTrace,
     role,

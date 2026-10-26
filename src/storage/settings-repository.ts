@@ -23,6 +23,14 @@ export function validatePort(port: number): boolean {
   return Number.isInteger(port) && port >= MIN_PORT && port <= MAX_PORT;
 }
 
+export const DEFAULT_SETTINGS: Settings = {
+  port: DEFAULT_PORT,
+  speedUnit: "kph",
+  temperatureUnit: "c",
+  traceRetention: "all",
+  storeInvalidLaps: true,
+};
+
 const KEYS = {
   port: "udp.port",
   speedUnit: "units.speed",

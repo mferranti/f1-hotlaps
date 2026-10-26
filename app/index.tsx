@@ -2,7 +2,7 @@ import { Link, useFocusEffect } from "expo-router";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import * as Network from "expo-network";
 import { useCallback, useEffect, useState } from "react";
-import { Button, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { usePacketActivity } from "@/activity/use-packet-activity";
 import { lapRepository, subscribeLaps } from "@/capture/runtime";
@@ -19,6 +19,7 @@ import { PacketGraph } from "@/ui/PacketGraph";
 import { SessionsTable } from "@/ui/SessionsTable";
 import { StatusDot } from "@/ui/StatusDot";
 import { colors } from "@/ui/theme";
+import { useSettings } from "@/ui/use-settings";
 
 const RECENT = 3;
 
@@ -29,6 +30,7 @@ export default function MainScreen() {
   const [laps, setLaps] = useState<LapSummary[]>([]);
   const [recentLaps, setRecentLaps] = useState<LapSummary[]>([]);
   const [recentSessions, setRecentSessions] = useState<SessionSummary[]>([]);
+  const { speedUnit } = useSettings();
 
   const loadRecent = useCallback(async () => {
     try {
@@ -95,7 +97,7 @@ export default function MainScreen() {
             Lap {car.lapNumber} · {formatLapTime(car.currentLapTimeMs)}
           </Text>
           <Text style={styles.car}>
-            {formatSpeed(car.speedKph, "kph")} · throttle {Math.round(car.throttle * 100)}% · brake{" "}
+            {formatSpeed(car.speedKph, speedUnit)} · throttle {Math.round(car.throttle * 100)}% · brake{" "}
             {Math.round(car.brake * 100)}%
           </Text>
         </View>
@@ -111,15 +113,29 @@ export default function MainScreen() {
         </Text>
       ) : null}
 
-      <LapsTable laps={recentLaps} peers={laps} />
-      <Link href="/laps" asChild>
-        <Button title="Laps history" color={colors.accent} />
-      </Link>
+      <View style={styles.sectionBlock}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.section}>Latest laps</Text>
+          <Link href="/laps" asChild>
+            <Pressable>
+              <Text style={styles.seeAll}>See all</Text>
+            </Pressable>
+          </Link>
+        </View>
+        <LapsTable laps={recentLaps} peers={laps} showWeather={false} showFinishedTime />
+      </View>
 
-      <SessionsTable sessions={recentSessions} />
-      <Link href="/sessions" asChild>
-        <Button title="Sessions history" color={colors.accent} />
-      </Link>
+      <View style={styles.sectionBlock}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.section}>Latest Sessions</Text>
+          <Link href="/sessions" asChild>
+            <Pressable>
+              <Text style={styles.seeAll}>See all</Text>
+            </Pressable>
+          </Link>
+        </View>
+        <SessionsTable sessions={recentSessions} />
+      </View>
     </ScrollView>
   );
 }
@@ -131,6 +147,10 @@ const styles = StyleSheet.create({
   rate: { color: colors.text, fontSize: 22, fontVariant: ["tabular-nums"] },
   muted: { color: colors.muted },
   title: { color: colors.text, fontSize: 18, fontWeight: "600" },
+  sectionBlock: { gap: 8 },
+  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  section: { color: colors.text, fontSize: 18, fontWeight: "700" },
+  seeAll: { color: colors.accent, fontSize: 16, fontWeight: "600" },
   car: { color: colors.text, marginTop: 8 },
   card: {
     backgroundColor: colors.card,

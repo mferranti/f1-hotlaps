@@ -1,47 +1,48 @@
-import { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { lapRepository } from "@/capture/runtime";
 import { sessionTypeName } from "@/protocol/session-types";
 import { teamName } from "@/protocol/teams";
 import { trackFlag, trackName } from "@/protocol/tracks";
-import type { SessionSummary } from "@/storage/lap-repository";
+import type { SessionFacets, SessionPageQuery } from "@/storage/lap-repository";
 import { CheckRow } from "@/ui/CheckRow";
 import { Chip } from "@/ui/Chip";
-import { SessionsTable } from "@/ui/SessionsTable";
+import { PagedList } from "@/ui/PagedList";
+import { SessionRow, SessionsEmpty, SessionsHeader } from "@/ui/SessionsTable";
 import { colors } from "@/ui/theme";
+import { usePage } from "@/ui/use-page";
 
 export default function SessionsScreen() {
   const [trackId, setTrackId] = useState<number | undefined>();
   const [teamId, setTeamId] = useState<number | undefined>();
   const [sessionType, setSessionType] = useState<number | undefined>();
-  const [all, setAll] = useState<SessionSummary[]>([]);
+  const [facets, setFacets] = useState<SessionFacets>({ trackIds: [], teamIds: [], sessionTypes: [] });
   const [trackOpen, setTrackOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [hideInvalid, setHideInvalid] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    void lapRepository().listSessions({ validOnly: hideInvalid }).then(setAll);
+  const query = useMemo(
+    () => ({ validOnly: hideInvalid, trackId, teamId, sessionType }),
+    [hideInvalid, trackId, teamId, sessionType],
+  );
+  const loadSessions = useCallback(
+    (pageQuery: SessionPageQuery) => lapRepository().listSessionPage(pageQuery),
+    [],
+  );
+  const page = usePage(loadSessions, query);
+
+  const reloadFacets = useCallback(() => {
+    void lapRepository().listSessionFacets({ validOnly: hideInvalid }).then(setFacets);
   }, [hideInvalid]);
 
-  async function refresh() {
-    setAll(await lapRepository().listSessions({ validOnly: hideInvalid }));
-  }
+  useEffect(() => {
+    void lapRepository().listSessionFacets({ validOnly: hideInvalid }).then(setFacets);
+  }, [hideInvalid]);
 
-  const sessions = useMemo(
-    () =>
-      all.filter(
-        (session) =>
-          (trackId === undefined || session.trackId === trackId) &&
-          (teamId === undefined || session.teamId === teamId) &&
-          (sessionType === undefined || session.sessionType === sessionType),
-      ),
-    [all, trackId, teamId, sessionType],
-  );
-  const tracks = [...new Set(all.map((session) => session.trackId))].sort((a, b) => a - b);
-  const teams = [...new Set(all.map((session) => session.teamId))].sort((a, b) => a - b);
-  const types = [...new Set(all.map((session) => session.sessionType))].sort((a, b) => a - b);
+  const tracks = facets.trackIds;
+  const teams = facets.teamIds;
+  const types = facets.sessionTypes;
 
   return (
     <View style={styles.screen}>
@@ -56,22 +57,22 @@ export default function SessionsScreen() {
         </Pressable>
       </View>
 
-      <ScrollView
+      <PagedList
+        items={page.items}
+        keyExtractor={(session) => String(session.id)}
+        hasMore={page.hasMore}
+        loadingMore={page.loadingMore}
+        onLoadMore={page.loadMore}
+        refreshing={page.refreshing}
+        onRefresh={() => {
+          void page.refresh();
+          reloadFacets();
+        }}
         contentContainerStyle={styles.table}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              void refresh().finally(() => setRefreshing(false));
-            }}
-            tintColor={colors.accent}
-            colors={[colors.accent]}
-          />
-        }
-      >
-        <SessionsTable sessions={sessions} />
-      </ScrollView>
+        listHeader={<SessionsHeader />}
+        listEmpty={page.loaded ? <SessionsEmpty /> : null}
+        renderItem={(session) => <SessionRow session={session} />}
+      />
 
       <Modal visible={trackOpen} animationType="fade" transparent onRequestClose={() => setTrackOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setTrackOpen(false)}>
