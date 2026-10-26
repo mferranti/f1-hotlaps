@@ -15,6 +15,7 @@ import { LineChart } from "@/ui/LineChart";
 import { colors } from "@/ui/theme";
 import {
   parseTraceGraphId,
+  traceGraphScale,
   traceGraphSeries,
   traceGraphTitle,
   traceGraphYLabel,
@@ -82,6 +83,7 @@ export default function LapGraphScreen() {
           series={traceGraphSeries(graphId, lap.trace, overlay, speedUnit)}
           markers={traceSectorMarkers(lap.trace, lap.sector1Ms, lap.sector2Ms)}
           centerZero={graphId === "delta"}
+          yScale={traceGraphScale(graphId)}
           height={chartH > 0 ? chartH : undefined}
         />
       </View>

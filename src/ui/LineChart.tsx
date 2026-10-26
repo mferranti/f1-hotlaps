@@ -20,7 +20,15 @@ export interface ChartMarker {
   label: string;
 }
 
-const PAD_LEFT = 40;
+/** A fixed vertical scale. Ticks stay put when the Trace does not reach both ends. */
+export interface ChartScale {
+  min: number;
+  max: number;
+  ticks?: readonly number[];
+  format?: (value: number) => string;
+}
+
+const PAD_LEFT = 46;
 const PAD_RIGHT = 10;
 const PAD_TOP = 16;
 const PAD_BOTTOM = 24;
@@ -36,6 +44,7 @@ export function LineChart({
   height,
   markers = [],
   centerZero = false,
+  yScale,
 }: {
   series: readonly ChartSeries[];
   xLabel: string;
@@ -46,6 +55,8 @@ export function LineChart({
   markers?: readonly ChartMarker[];
   /** Keep 0 in the middle of the vertical axis. */
   centerZero?: boolean;
+  /** Replaces the scale taken from the series. */
+  yScale?: ChartScale;
 }) {
   const [width, setWidth] = useState(0);
   const svgH = height != null ? Math.max(1, height - LABEL_H * 2) : HEIGHT;
@@ -56,7 +67,7 @@ export function LineChart({
   const xMax = Math.max(...points.map((point) => point.x));
   const rawMin = Math.min(...points.map((point) => point.y));
   const rawMax = Math.max(...points.map((point) => point.y));
-  const domain = centerZero ? centeredDomain(rawMin, rawMax) : { min: rawMin, max: rawMax };
+  const domain = yScale ?? (centerZero ? centeredDomain(rawMin, rawMax) : { min: rawMin, max: rawMax });
   const yMin = domain.min;
   const yMax = domain.max;
   const xSpan = xMax - xMin || 1;
@@ -70,7 +81,8 @@ export function LineChart({
   const xTicks = axisTicks(xMin, xMax, TICKS).filter((tick) =>
     drawnMarkers.every((marker) => Math.abs(marker.x - tick) > xSpan * 0.06),
   );
-  const yTicks = axisTicks(yMin, yMax, TICKS);
+  const yTicks = yScale?.ticks ?? axisTicks(yMin, yMax, TICKS);
+  const formatY = yScale?.format ?? formatTick;
 
   return (
     <View style={height != null ? { height } : undefined} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
@@ -122,7 +134,7 @@ export function LineChart({
               fontSize={8}
               textAnchor="end"
             >
-              {formatTick(tick)}
+              {formatY(tick)}
             </SvgText>
           ))}
           {xTicks.map((tick, index) => (

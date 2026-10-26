@@ -2,7 +2,7 @@ import { deltaByDistance } from "@/domain/delta";
 import { sectorEndDistances } from "@/domain/sector-distance";
 import type { TraceSample } from "@/domain/types";
 import { speedValue, type SpeedUnit } from "@/domain/units";
-import type { ChartMarker, ChartSeries } from "@/ui/LineChart";
+import type { ChartMarker, ChartScale, ChartSeries } from "@/ui/LineChart";
 import { colors } from "@/ui/theme";
 
 export const TRACE_GRAPH_IDS = ["speed", "brake", "throttle", "gear", "drs", "ers", "delta"] as const;
@@ -24,6 +24,28 @@ export function parseTraceGraphId(value: string | undefined): TraceGraphId | nul
 
 export function traceGraphTitle(id: TraceGraphId): string {
   return TITLES[id];
+}
+
+const GEARS = [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8];
+
+function gearLabel(value: number): string {
+  if (value === -1) return "R";
+  if (value === 0) return "N";
+  return String(value);
+}
+
+/** Fixed vertical scale for a Trace graph. Speed, ERS, and Delta keep a scale from the samples. */
+export function traceGraphScale(id: TraceGraphId): ChartScale | undefined {
+  if (id === "throttle" || id === "brake") {
+    return { min: 0, max: 100, ticks: [0, 25, 50, 75, 100], format: (value) => `${Math.round(value)}%` };
+  }
+  if (id === "gear") {
+    return { min: -1, max: 8, ticks: GEARS, format: gearLabel };
+  }
+  if (id === "drs") {
+    return { min: 0, max: 1, ticks: [0, 1], format: (value) => (value === 0 ? "Close" : "Open") };
+  }
+  return undefined;
 }
 
 export function traceGraphYLabel(id: TraceGraphId, speedUnit: SpeedUnit): string {
@@ -106,5 +128,6 @@ function zeroCrossing(from: { x: number; y: number }, to: { x: number; y: number
 function sampleValue(id: Exclude<TraceGraphId, "delta">, sample: TraceSample, speedUnit: SpeedUnit): number {
   if (id === "speed") return speedValue(sample.speedKph, speedUnit);
   if (id === "ers") return sample.ers / 1_000_000;
+  if (id === "throttle" || id === "brake") return sample[id] * 100;
   return sample[id];
 }

@@ -21,6 +21,7 @@ import { SectorBar, sectorInk } from "@/ui/SectorBar";
 import { colors } from "@/ui/theme";
 import {
   TRACE_GRAPH_IDS,
+  traceGraphScale,
   traceGraphSeries,
   traceGraphTitle,
   traceGraphYLabel,
@@ -242,6 +243,7 @@ function TraceGraphPreview({
         series={series}
         markers={markers}
         centerZero={centerZero}
+        yScale={traceGraphScale(graphId)}
       />
     </>
   );

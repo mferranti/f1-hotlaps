@@ -4,6 +4,7 @@ import { colors } from "@/ui/theme";
 import {
   deltaLineSeries,
   parseTraceGraphId,
+  traceGraphScale,
   traceGraphSeries,
   traceGraphTitle,
   traceGraphYLabel,
@@ -72,6 +73,40 @@ describe("deltaLineSeries", () => {
       { color: colors.accent, points: [{ x: 0, y: 10 }, { x: 5, y: 0 }] },
       { color: colors.green, points: [{ x: 5, y: 0 }, { x: 10, y: -10 }] },
     ]);
+  });
+});
+
+describe("traceGraphScale", () => {
+  it("plots throttle and brake from 0% to 100%", () => {
+    const lap = [
+      { ...sample(0, 100), throttle: 0, brake: 0.25 },
+      { ...sample(10, 200), throttle: 1, brake: 0.5 },
+    ];
+    expect(traceGraphSeries("throttle", lap, null, "kph")[0]?.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 10, y: 100 },
+    ]);
+    expect(traceGraphSeries("brake", lap, null, "kph")[0]?.points).toEqual([
+      { x: 0, y: 25 },
+      { x: 10, y: 50 },
+    ]);
+    const scale = traceGraphScale("throttle");
+    expect(scale).toMatchObject({ min: 0, max: 100, ticks: [0, 25, 50, 75, 100] });
+    expect(scale?.ticks?.map((tick) => scale.format?.(tick))).toEqual(["0%", "25%", "50%", "75%", "100%"]);
+    expect(traceGraphScale("brake")?.format?.(100)).toBe("100%");
+  });
+
+  it("labels gears from reverse through 8", () => {
+    const scale = traceGraphScale("gear");
+    expect(scale).toMatchObject({ min: -1, max: 8, ticks: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8] });
+    expect(scale?.ticks?.map((tick) => scale.format?.(tick))).toEqual(["R", "N", "1", "2", "3", "4", "5", "6", "7", "8"]);
+  });
+
+  it("labels DRS closed at the bottom and open at the top", () => {
+    const scale = traceGraphScale("drs");
+    expect(scale).toMatchObject({ min: 0, max: 1, ticks: [0, 1] });
+    expect(scale?.format?.(0)).toBe("Close");
+    expect(scale?.format?.(1)).toBe("Open");
   });
 });
 
