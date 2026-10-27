@@ -29,7 +29,7 @@ export function SectorBar({
       <Text style={[styles.time, large && styles.timeLarge]}>{formatLapTime(lapTimeMs)}</Text>
       <View style={[styles.row, compact && styles.rowCompact]}>
         {inks.map((color, index) => (
-          <View key={index} style={{ flex: 1, gap: compact ? 0 : 2 }}>
+          <View key={index} style={compact ? styles.segmentCompact : styles.segment}>
             <View style={[styles.line, compact && styles.lineCompact, { backgroundColor: color }]} />
             {showTimes ? (
               <Text style={[styles.sector, large && styles.sectorLarge, { color }]}>
@@ -52,11 +52,13 @@ export function sectorInk(color: SectorColor): string {
 const styles = StyleSheet.create({
   wrap: { gap: 4 },
   wrapLarge: { gap: 8 },
-  wrapFit: { alignSelf: "flex-start" },
+  wrapFit: { alignSelf: "flex-start", paddingBottom: 6 },
   time: { color: colors.text, fontSize: 13, fontVariant: ["tabular-nums"], fontWeight: "600" },
   timeLarge: { fontSize: 28 },
   row: { flexDirection: "row", gap: 6 },
-  rowCompact: { gap: 2 },
+  rowCompact: { position: "absolute", left: 0, right: 0, bottom: 0, gap: 2 },
+  segment: { flex: 1, gap: 2 },
+  segmentCompact: { flex: 1 },
   line: { height: 3, borderRadius: 2 },
   lineCompact: { height: 2, borderRadius: 1 },
   sector: { color: colors.muted, fontSize: 12, fontVariant: ["tabular-nums"] },

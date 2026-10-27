@@ -69,9 +69,9 @@ export default function SessionsScreen() {
           reloadFacets();
         }}
         contentContainerStyle={styles.table}
-        listHeader={<SessionsHeader />}
+        listHeader={<SessionsHeader showFastest />}
         listEmpty={page.loaded ? <SessionsEmpty /> : null}
-        renderItem={(session) => <SessionRow session={session} />}
+        renderItem={(session) => <SessionRow session={session} showFastest />}
       />
 
       <Modal visible={trackOpen} animationType="fade" transparent onRequestClose={() => setTrackOpen(false)}>

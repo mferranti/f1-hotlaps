@@ -69,7 +69,7 @@ export default function SessionDetailScreen() {
         checked={hideInvalid}
         onPress={() => setHideInvalid((value) => !value)}
       />
-      <LapsTable laps={shown} peers={session.laps} showLapNumber />
+      <LapsTable laps={shown} peers={session.laps} showLapNumber showTyre />
     </ScrollView>
   );
 }

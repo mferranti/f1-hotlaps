@@ -116,13 +116,14 @@ export default function LapsHistoryScreen() {
           void reloadTrack();
         }}
         contentContainerStyle={styles.table}
-        listHeader={<LapsHeader showFinishedTime />}
+        listHeader={<LapsHeader showTyre showFinishedTime />}
         listEmpty={page.loaded ? <LapsEmpty /> : null}
         extraData={colorPeers}
         renderItem={(lap) => (
           <LapRow
             lap={lap}
             colorPeers={colorPeers}
+            showTyre
             showFinishedTime
             speedUnit={speedUnit}
             temperatureUnit={temperatureUnit}

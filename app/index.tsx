@@ -122,7 +122,15 @@ export default function MainScreen() {
             </Pressable>
           </Link>
         </View>
-        <LapsTable laps={recentLaps} peers={laps} showWeather={false} showFinishedTime />
+        <LapsTable
+          laps={recentLaps}
+          peers={laps}
+          showTrack
+          showMode={false}
+          showWeather={false}
+          showFinishedTime
+          preview
+        />
       </View>
 
       <View style={styles.sectionBlock}>
@@ -134,7 +142,7 @@ export default function MainScreen() {
             </Pressable>
           </Link>
         </View>
-        <SessionsTable sessions={recentSessions} />
+        <SessionsTable sessions={recentSessions} preview />
       </View>
     </ScrollView>
   );
