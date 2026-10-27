@@ -2,6 +2,7 @@
   "name": "f1-hotlaps",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "main": "expo-router/entry",
   "packageManager": "pnpm@10.18.0",
   "engines": {

@@ -95,3 +95,7 @@ pnpm packets trim fixtures/captures/session.bin --from 61.2s --to 152.9s --out f
 ```
 
 Full captures belong in `fixtures/captures/`, which is gitignored.
+
+## License
+
+The code in this repository is [MIT](LICENSE). `docs/telemetry/` is published by Electronic Arts and is not covered by that license.

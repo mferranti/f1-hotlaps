@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "description": "Custom-content picture-in-picture so F1 Hotlaps can keep receiving Packets in the background.",
   "main": "index.ts",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "homepage": "https://github.com/mferranti/f1-hotlaps",
   "author": "F1 Hotlaps"
 }
