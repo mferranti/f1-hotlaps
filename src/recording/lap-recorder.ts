@@ -32,8 +32,12 @@ interface PendingLap {
 /**
  * Decides which finished circuits count as a Lap. The recorder must have seen
  * the Lap start, and Session History must report a time above zero. A Session
- * start counts as seeing the following Lap from the line. A flashback is
- * stored with valid set to false. Pit stops and garage or in/out laps are
+ * start counts as seeing the following Lap from the line. A Lap closes when
+ * the next one starts, or when Session History reports a time for the Lap
+ * still being observed. That second case is the last Lap of a Race: the next
+ * Lap never starts. Session end leaves that Lap open until Session History
+ * confirms it. A Lap still in progress, with no time, is dropped. A flashback
+ * is stored with valid set to false. Pit stops and garage or in/out laps are
  * dropped. A Lap the Game marks Invalid is returned with valid set to false.
  */
 export class LapRecorder {
@@ -69,6 +73,9 @@ export class LapRecorder {
   private lastSector2Ms = 0;
   private trace = new TraceBuilder();
   private pending: PendingLap | null = null;
+  private nowMs = 0;
+  /** Session end. The Lap in progress stays open until Session History confirms it. */
+  private sessionEnded = false;
 
   /** Drop the Lap in progress (app went to the background without picture-in-picture). */
   reset(): void {
@@ -79,10 +86,12 @@ export class LapRecorder {
     this.discarded = false;
     this.gameInvalid = false;
     this.flashback = false;
+    this.sessionEnded = false;
     this.trace = new TraceBuilder();
   }
 
   push(packet: DecodedPacket, nowMs: number): CompletedLap | undefined {
+    this.nowMs = nowMs;
     if (packet.header.sessionUid !== this.sessionUid) {
       this.reset();
       this.sessionUid = packet.header.sessionUid;
@@ -139,13 +148,15 @@ export class LapRecorder {
         }
         return undefined;
       case "lapData":
-        return this.onLapData(packet, nowMs);
+        if (this.sessionEnded) return undefined;
+        return this.onLapData(packet);
       case "event":
         if (packet.event.code === "FLBK") this.flashback = true;
-        if (packet.event.code === "SSTA" || packet.event.code === "SEND") {
+        if (packet.event.code === "SSTA") {
           this.reset();
-          if (packet.event.code === "SSTA") this.armFirstLap = true;
+          this.armFirstLap = true;
         }
+        if (packet.event.code === "SEND") this.sessionEnded = true;
         return undefined;
       case "sessionHistory":
         return packet.data.carIdx === this.player ? this.onHistory(packet.data.laps) : undefined;
@@ -154,11 +165,9 @@ export class LapRecorder {
     }
   }
 
-  private onLapData(packet: Extract<DecodedPacket, { kind: "lapData" }>, nowMs: number): CompletedLap | undefined {
+  private onLapData(packet: Extract<DecodedPacket, { kind: "lapData" }>): CompletedLap | undefined {
     if (this.player >= packet.cars.length) return undefined;
     const car = playerCar(packet.cars, this.player);
-    const sector1Ms = this.lastSector1Ms;
-    const sector2Ms = this.lastSector2Ms;
     this.lastDistanceM = car.lapDistanceM;
     this.lastElapsedMs = car.currentLapTimeMs;
     this.lastSector1Ms = car.sector1Ms;
@@ -177,28 +186,7 @@ export class LapRecorder {
 
     if (car.currentLapNum === this.observingLap) return undefined;
 
-    if (this.started && !this.discarded) {
-      this.pending = {
-        lapNumber: this.observingLap,
-        lapTimeMs: car.lastLapTimeMs,
-        sector1Ms,
-        sector2Ms,
-        condition: conditionFromWeather(this.weather),
-        teamId: this.teamId,
-        tyreCompound: this.tyreCompound,
-        visualTyreCompound: this.visualTyreCompound,
-        tyreAgeLaps: this.tyreAgeLaps,
-        trackTempC: this.trackTempC,
-        airTempC: this.airTempC,
-        setup: { ...this.setup },
-        finishedAt: nowMs,
-        trace: this.trace.samples(),
-        gameInvalid: this.gameInvalid,
-        flashback: this.flashback,
-      };
-    } else {
-      this.pending = null;
-    }
+    this.pending = this.started && !this.discarded ? this.snapshot(this.observingLap) : null;
 
     const rewound = car.currentLapNum < this.observingLap;
     this.observingLap = car.currentLapNum;
@@ -207,8 +195,6 @@ export class LapRecorder {
     this.gameInvalid = false;
     this.flashback = rewound;
     this.trace = new TraceBuilder();
-    this.lastDistanceM = car.lapDistanceM;
-    this.lastElapsedMs = car.currentLapTimeMs;
     this.latchInvalid(car);
     return undefined;
   }
@@ -225,7 +211,38 @@ export class LapRecorder {
     if (car.currentLapInvalid) this.gameInvalid = true;
   }
 
+  private snapshot(lapNumber: number): PendingLap {
+    return {
+      lapNumber,
+      lapTimeMs: 0,
+      sector1Ms: this.lastSector1Ms,
+      sector2Ms: this.lastSector2Ms,
+      condition: conditionFromWeather(this.weather),
+      teamId: this.teamId,
+      tyreCompound: this.tyreCompound,
+      visualTyreCompound: this.visualTyreCompound,
+      tyreAgeLaps: this.tyreAgeLaps,
+      trackTempC: this.trackTempC,
+      airTempC: this.airTempC,
+      setup: { ...this.setup },
+      finishedAt: this.nowMs,
+      trace: this.trace.samples(),
+      gameInvalid: this.gameInvalid,
+      flashback: this.flashback,
+    };
+  }
+
+  /** The Lap still being observed already has a time, so the next Lap will not start. */
+  private holdCurrentLap(laps: readonly LapHistoryEntry[]): void {
+    if (this.observingLap === null || !this.started || this.discarded) return;
+    const entry = laps[this.observingLap - 1];
+    if (!entry || entry.lapTimeMs <= 0) return;
+    this.pending = this.snapshot(this.observingLap);
+    this.started = false;
+  }
+
   private onHistory(laps: readonly LapHistoryEntry[]): CompletedLap | undefined {
+    if (!this.pending) this.holdCurrentLap(laps);
     if (!this.pending) return undefined;
     const entry = laps[this.pending.lapNumber - 1];
     if (!entry || entry.lapTimeMs <= 0) return undefined;

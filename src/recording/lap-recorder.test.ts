@@ -67,15 +67,21 @@ function lapFor(
   return writer.bytes;
 }
 
-function history(finished: { timeMs: number; valid: boolean }[]) {
-  return historyFor(FORMAT, PLAYER, finished);
+function history(finished: { timeMs: number; valid: boolean }[], frame = 0) {
+  return historyFor(FORMAT, PLAYER, finished, frame);
 }
 
-function historyFor(format: 2025 | 2026, player: number, finished: { timeMs: number; valid: boolean }[]) {
+function historyFor(
+  format: 2025 | 2026,
+  player: number,
+  finished: { timeMs: number; valid: boolean }[],
+  frame = 0,
+) {
   const writer = packetWithHeader(SESSION_HISTORY_PACKET_BYTES, {
     packetFormat: format,
     packetId: PacketId.SessionHistory,
     playerCarIndex: player,
+    frameIdentifier: frame,
   });
   writer.uint8(player).uint8(finished.length + 1).skip(5);
   for (const entry of finished) {
@@ -92,12 +98,34 @@ function historyFor(format: 2025 | 2026, player: number, finished: { timeMs: num
   return writer.bytes;
 }
 
-function event(code: string) {
+function event(code: string, frame = 0) {
   return packetWithHeader(EVENT_PACKET_BYTES, {
     packetFormat: FORMAT,
     packetId: PacketId.Event,
     playerCarIndex: PLAYER,
+    frameIdentifier: frame,
   }).ascii(code).bytes;
+}
+
+function finishedLaps(count: number) {
+  return Array.from({ length: count }, (_, index) => ({
+    timeMs: 80_000 + (index + 1) * 1_000,
+    valid: true,
+  }));
+}
+
+/** Five Lap Race. The car stays on Lap 5; the next Lap never starts. */
+function fiveLapRace(finalHistory: "before-end" | "after-end") {
+  const packets: Uint8Array[] = [session(), event("SSTA", 50)];
+  for (let lapNumber = 1; lapNumber <= 5; lapNumber += 1) {
+    packets.push(lap(lapNumber, { lastMs: 80_000 + lapNumber * 1_000 }));
+    if (lapNumber > 1) packets.push(history(finishedLaps(lapNumber - 1), lapNumber * 100 + 40));
+  }
+  const confirmed = history(finishedLaps(5), finalHistory === "before-end" ? 540 : 600);
+  if (finalHistory === "before-end") packets.push(confirmed);
+  packets.push(event("SEND", 580));
+  if (finalHistory === "after-end") packets.push(confirmed);
+  return packets;
 }
 
 function pushAll(recorder: LapRecorder, packets: Uint8Array[], now = 1_000) {
@@ -209,10 +237,37 @@ describe("LapRecorder", () => {
     expect(storesLap(false, false)).toBe(false);
   });
 
-  it("drops a pending Lap when the Session ends", () => {
+  it.each(["before-end", "after-end"] as const)(
+    "stores the last Lap of a 5 Lap Race when Session History arrives %s",
+    (finalHistory) => {
+      const recorder = new LapRecorder();
+      const committed = pushAll(recorder, fiveLapRace(finalHistory));
+      expect(committed.map((lap) => lap.lapNumber)).toEqual([1, 2, 3, 4, 5]);
+      expect(committed.every((lap) => lap.valid)).toBe(true);
+      expect(committed[4]?.lapTimeMs).toBe(85_000);
+    },
+  );
+
+  it("drops the Lap in progress when the Session ends", () => {
     const recorder = new LapRecorder();
-    const committed = pushAll(recorder, [session(), lap(1), lap(2), lap(3), event("SEND"), history([{ timeMs: 1, valid: true }, { timeMs: 2, valid: true }])]);
-    expect(committed).toEqual([]);
+    const committed = pushAll(recorder, [
+      session(),
+      event("SSTA", 50),
+      lap(1),
+      lap(2, { lastMs: 81_000 }),
+      history([{ timeMs: 81_000, valid: true }], 240),
+      lap(3),
+      event("SEND", 580),
+      history(
+        [
+          { timeMs: 81_000, valid: true },
+          { timeMs: 82_000, valid: true },
+        ],
+        640,
+      ),
+    ]);
+    expect(committed.map((lap) => lap.lapNumber)).toEqual([1, 2]);
+    expect(committed.every((lap) => lap.valid)).toBe(true);
   });
 
   it.each([
